@@ -56,6 +56,10 @@ New business functionality should include tests when practical.
 
 Existing functionality should not be intentionally broken.
 
+Tests must run against PostgreSQL. Use `TEST_DATABASE_URL` for the test database.
+
+Never use SQLite as a test database fallback.
+
 ## Code changes
 
 Avoid modifying unrelated files.
@@ -70,24 +74,31 @@ Before making significant changes, inspect the existing implementation.
 
 Preserve existing working behavior unless explicitly instructed otherwise.
 
-## Inventory system
+## Harvest tracking system
 
-The application is an inventory reception system designed to work with USB barcode scanners.
+The application is an agricultural harvest tracking system designed to work with USB barcode scanners.
 
-The primary reception workflow is:
+Each worker has a unique barcode. During the day, a worker can register multiple harvest entries (tandas de cosecha).
 
-1. Scan or enter barcode.
+The primary workflow is:
+
+1. Scan or enter the worker's barcode.
 2. Press Enter.
-3. Find the product.
-4. Display product information and current stock.
-5. Focus the quantity field.
-6. Enter received quantity.
+3. Find the worker.
+4. Display worker information and daily accumulated weight.
+5. Focus the weight field.
+6. Enter the weight in kg for the new batch.
 7. Press Enter or click the registration button.
-8. Register the receipt.
-9. Show confirmation.
+8. Register the harvest entry.
+9. Show confirmation with the new daily total.
 10. Return focus to the barcode field.
 
 This keyboard-first workflow must be preserved.
+
+Weight values use Decimal precision (Numeric 10,3).
+
+The daily total is calculated using a date range converted to UTC,
+not a simple DATE() comparison.
 
 ## Communication
 
