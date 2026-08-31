@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Recepción de mercancía</title>
+</head>
+
+<body>
+
+    <h1>Recepción de mercancía</h1>
+
+    <label for="barcode">Código de barras</label>
+
+    <input type="text" id="barcode" placeholder="Escanee un producto" autocomplete="off" autofocus>
+
+    <div id="product-info">
+        <p>Esperando producto...</p>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/reception.js') }}"></script>
+</body>
+
+</html>
