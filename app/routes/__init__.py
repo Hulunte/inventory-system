@@ -1,2 +1,2 @@
-from app.routes.products import products_bp
-from app.routes.inventory import inventory_bp
+from app.routes.workers import workers_bp
+from app.routes.harvest import harvest_bp

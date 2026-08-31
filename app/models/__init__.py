@@ -1,2 +1,2 @@
-from app.models.product import Product
-from app.models.inventory_movement import InventoryMovement
+from app.models.worker import Worker
+from app.models.harvest_entry import HarvestEntry

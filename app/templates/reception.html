@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Recepción de mercancía</title>
+    <title>Registro de cosecha</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reception.css') }}">
 </head>
@@ -15,8 +15,8 @@
     <div class="reception-wrapper">
 
         <header class="reception-header">
-            <h1 class="reception-header__title">Recepción de mercancía</h1>
-            <p class="reception-header__subtitle">Escanee el código de barras del producto</p>
+            <h1 class="reception-header__title">Registro de cosecha</h1>
+            <p class="reception-header__subtitle">Escanee el código del trabajador</p>
         </header>
 
         <section class="card scanner-zone">
@@ -32,14 +32,14 @@
                     <line x1="7" y1="16" x2="17" y2="16" />
                 </svg>
             </div>
-            <label class="scanner-zone__label" for="barcode">Código de barras</label>
+            <label class="scanner-zone__label" for="barcode">Código del trabajador</label>
             <input class="scanner-zone__input" type="text" id="barcode"
                 placeholder="Escanee o escriba un código" autocomplete="off" autofocus>
         </section>
 
         <div id="product-info" class="card">
             <div class="status-message status-message--idle">
-                Esperando producto...
+                Esperando trabajador...
             </div>
         </div>
 

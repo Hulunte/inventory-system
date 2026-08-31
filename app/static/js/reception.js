@@ -17,19 +17,19 @@ barcodeInput.addEventListener("keydown", async (event) => {
     productInfo.innerHTML = `
         <div class="status-message status-message--loading">
             <span class="spinner"></span>
-            Buscando producto...
+            Buscando trabajador...
         </div>
     `;
 
     try {
         const response = await fetch(
-            `/api/products/${encodeURIComponent(barcode)}`
+            `/api/workers/${encodeURIComponent(barcode)}`
         );
 
         if (response.status === 404) {
             productInfo.innerHTML = `
                 <div class="status-message status-message--error">
-                    <p><strong>Producto no encontrado.</strong></p>
+                    <p><strong>Trabajador no encontrado.</strong></p>
                     <p>Código: ${barcode}</p>
                 </div>
             `;
@@ -39,72 +39,67 @@ barcodeInput.addEventListener("keydown", async (event) => {
         }
 
         if (!response.ok) {
-            throw new Error("Error al consultar el producto");
+            throw new Error("Error al consultar el trabajador");
         }
 
-        const product = await response.json();
+        const worker = await response.json();
 
-        await showProduct(product);
+        await showWorker(worker);
 
     } catch (error) {
         console.error(error);
 
         productInfo.innerHTML = `
             <div class="status-message status-message--error">
-                No fue posible consultar el producto.
+                No fue posible consultar el trabajador.
             </div>
         `;
     }
 });
 
 
-async function showProduct(product) {
+async function showWorker(worker) {
     try {
         const response = await fetch(
-            `/api/inventory/stock/${encodeURIComponent(product.barcode)}`
+            `/api/harvest/daily/${encodeURIComponent(worker.barcode)}`
         );
 
         if (!response.ok) {
-            throw new Error("Error al consultar el inventario");
+            throw new Error("Error al consultar el total diario");
         }
 
-        const inventory = await response.json();
+        const daily = await response.json();
 
         productInfo.innerHTML = `
-            <div class="product-card">
-                <h2 class="product-card__name">${product.name}</h2>
+            <div class="worker-card">
+                <h2 class="worker-card__name">${worker.name}</h2>
 
-                <div class="product-card__details">
-                    <div class="product-card__detail">
-                        <span class="product-card__label">Código</span>
-                        <span class="product-card__value">${product.barcode}</span>
+                <div class="worker-card__details">
+                    <div class="worker-card__detail">
+                        <span class="worker-card__label">Código</span>
+                        <span class="worker-card__value">${worker.barcode}</span>
                     </div>
 
-                    <div class="product-card__detail">
-                        <span class="product-card__label">Unidad</span>
-                        <span class="product-card__value">${product.unit}</span>
-                    </div>
-
-                    <div class="product-card__detail product-card__detail--full">
-                        <span class="product-card__label">Stock actual</span>
+                    <div class="worker-card__detail worker-card__detail--full">
+                        <span class="worker-card__label">Total del día</span>
                         <div class="stock-display">
-                            <span class="stock-display__number">${inventory.stock}</span>
-                            <span class="stock-display__unit">${product.unit}</span>
+                            <span class="stock-display__number">${daily.daily_total}</span>
+                            <span class="stock-display__unit">kg</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="receipt-form">
-                    <label class="receipt-form__label" for="quantity">
-                        Cantidad recibida
+                    <label class="receipt-form__label" for="weight_kg">
+                        Peso de la tanda (kg)
                     </label>
 
                     <input
                         class="receipt-form__input"
                         type="number"
-                        id="quantity"
-                        min="1"
-                        step="1"
+                        id="weight_kg"
+                        min="0.001"
+                        step="0.001"
                         autocomplete="off"
                     >
 
@@ -113,24 +108,24 @@ async function showProduct(product) {
                         type="button"
                         id="register-receipt"
                     >
-                        Registrar entrada
+                        Registrar pesada
                     </button>
                 </div>
             </div>
         `;
 
 
-        const quantityInput = document.getElementById("quantity");
+        const weightInput = document.getElementById("weight_kg");
         const registerButton = document.getElementById("register-receipt");
 
         requestAnimationFrame(() => {
             setTimeout(() => {
-                quantityInput.focus({ preventScroll: true });
-                quantityInput.select();
+                weightInput.focus({ preventScroll: true });
+                weightInput.select();
             }, 150);
         });
 
-        quantityInput.addEventListener("keydown", (event) => {
+        weightInput.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {
                 event.preventDefault();
                 registerButton.click();
@@ -138,11 +133,11 @@ async function showProduct(product) {
         });
 
         registerButton.addEventListener("click", async () => {
-            const quantity = parseInt(quantityInput.value, 10);
+            const weightKg = parseFloat(weightInput.value);
 
-            if (!quantity || quantity <= 0) {
-                alert("Ingrese una cantidad válida.");
-                quantityInput.focus();
+            if (!weightKg || weightKg <= 0) {
+                alert("Ingrese un peso válido mayor a cero.");
+                weightInput.focus();
                 return;
             }
 
@@ -150,21 +145,21 @@ async function showProduct(product) {
             registerButton.textContent = "Registrando...";
 
             try {
-                const response = await fetch("/api/inventory/receipts", {
+                const response = await fetch("/api/harvest/entries", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        barcode: product.barcode,
-                        quantity: quantity
+                        barcode: worker.barcode,
+                        weight_kg: weightKg
                     })
                 });
 
                 const result = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(result.error || "No fue posible registrar la entrada");
+                    throw new Error(result.error || "No fue posible registrar la pesada");
                 }
 
                 productInfo.innerHTML = `
@@ -175,12 +170,13 @@ async function showProduct(product) {
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
                         </div>
-                        <h2 class="success-card__title">Entrada registrada correctamente</h2>
+                        <h2 class="success-card__title">Pesada registrada correctamente</h2>
                         <div class="success-card__details">
-                            <p><strong>Producto:</strong> ${product.name}</p>
-                            <p><strong>Cantidad recibida:</strong> ${quantity}</p>
+                            <p><strong>Trabajador:</strong> ${worker.name}</p>
+                            <p><strong>Peso registrado:</strong> ${result.weight_kg} kg</p>
+                            <p><strong>Total del día:</strong> ${result.daily_total} kg</p>
                         </div>
-                        <p class="success-card__hint">Preparado para el siguiente producto.</p>
+                        <p class="success-card__hint">Preparado para el siguiente trabajador.</p>
                     </div>
                 `;
 
@@ -193,11 +189,11 @@ async function showProduct(product) {
                 alert(error.message);
 
                 registerButton.disabled = false;
-                registerButton.textContent = "Registrar entrada";
+                registerButton.textContent = "Registrar pesada";
                 requestAnimationFrame(() => {
                     setTimeout(() => {
-                        quantityInput.focus({ preventScroll: true });
-                        quantityInput.select();
+                        weightInput.focus({ preventScroll: true });
+                        weightInput.select();
                     }, 150);
                 });
             }
@@ -207,7 +203,7 @@ async function showProduct(product) {
 
         productInfo.innerHTML = `
             <div class="status-message status-message--error">
-                Producto encontrado, pero no fue posible consultar el stock.
+                Trabajador encontrado, pero no fue posible consultar el total diario.
             </div>
         `;
     }
