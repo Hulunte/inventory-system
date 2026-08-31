@@ -1,0 +1,419 @@
+/* ============================================================
+   Reception - Warehouse Inventory System
+   ============================================================ */
+
+/* ---------- Reset & Base ---------- */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --clr-bg: #f0f2f5;
+    --clr-surface: #ffffff;
+    --clr-text: #1a1a2e;
+    --clr-text-muted: #6b7280;
+    --clr-border: #d1d5db;
+    --clr-primary: #2563eb;
+    --clr-primary-hover: #1d4ed8;
+    --clr-primary-light: #eff6ff;
+    --clr-success: #16a34a;
+    --clr-success-bg: #f0fdf4;
+    --clr-success-border: #bbf7d0;
+    --clr-error: #dc2626;
+    --clr-error-bg: #fef2f2;
+    --clr-error-border: #fecaca;
+    --clr-warning-bg: #fffbeb;
+    --clr-warning-border: #fde68a;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.1);
+    --transition: 0.2s ease;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, sans-serif;
+    background-color: var(--clr-bg);
+    color: var(--clr-text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+}
+
+/* ---------- Layout ---------- */
+
+.reception-wrapper {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* ---------- Header ---------- */
+
+.reception-header {
+    text-align: center;
+}
+
+.reception-header__title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--clr-text);
+    letter-spacing: -0.01em;
+}
+
+.reception-header__subtitle {
+    font-size: 0.9rem;
+    color: var(--clr-text-muted);
+    margin-top: 0.25rem;
+}
+
+/* ---------- Card ---------- */
+
+.card {
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.75rem;
+}
+
+/* ---------- Scanner Zone ---------- */
+
+.scanner-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.scanner-zone__icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--clr-primary-light);
+    border-radius: 50%;
+    color: var(--clr-primary);
+    flex-shrink: 0;
+}
+
+.scanner-zone__icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.scanner-zone__label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--clr-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.scanner-zone__input {
+    width: 100%;
+    font-size: 1.25rem;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    background: var(--clr-surface);
+    color: var(--clr-text);
+}
+
+.scanner-zone__input::placeholder {
+    color: var(--clr-text-muted);
+    opacity: 0.7;
+}
+
+.scanner-zone__input:focus {
+    border-color: var(--clr-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* ---------- Status Messages ---------- */
+
+.status-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-align: center;
+    width: 100%;
+}
+
+.status-message--loading {
+    background: var(--clr-primary-light);
+    color: var(--clr-primary);
+    border: 1px solid #bfdbfe;
+}
+
+.status-message--error {
+    background: var(--clr-error-bg);
+    color: var(--clr-error);
+    border: 1px solid var(--clr-error-border);
+}
+
+.status-message--idle {
+    background: var(--clr-bg);
+    color: var(--clr-text-muted);
+    border: 1px dashed var(--clr-border);
+}
+
+/* Spinner */
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2.5px solid rgba(37, 99, 235, 0.25);
+    border-top-color: var(--clr-primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ---------- Product Card ---------- */
+
+.product-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.product-card__name {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--clr-text);
+    line-height: 1.3;
+}
+
+.product-card__details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.product-card__detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.product-card__detail--full {
+    grid-column: 1 / -1;
+}
+
+.product-card__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--clr-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.product-card__value {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--clr-text);
+}
+
+/* Stock highlight */
+
+.stock-display {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.stock-display__number {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--clr-success);
+    line-height: 1;
+}
+
+.stock-display__unit {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--clr-text-muted);
+}
+
+/* ---------- Receipt Form ---------- */
+
+.receipt-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--clr-border);
+}
+
+.receipt-form__label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--clr-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.receipt-form__input {
+    width: 100%;
+    font-size: 1.5rem;
+    font-weight: 700;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    background: var(--clr-surface);
+    color: var(--clr-text);
+    -moz-appearance: textfield;
+}
+
+.receipt-form__input::-webkit-outer-spin-button,
+.receipt-form__input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.receipt-form__input:focus {
+    border-color: var(--clr-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.receipt-form__button {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: var(--clr-primary);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition), opacity var(--transition);
+    letter-spacing: 0.01em;
+}
+
+.receipt-form__button:hover {
+    background: var(--clr-primary-hover);
+}
+
+.receipt-form__button:active {
+    transform: scale(0.985);
+}
+
+.receipt-form__button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* ---------- Success Message ---------- */
+
+.success-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+}
+
+.success-card__icon {
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--clr-success-bg);
+    border: 2px solid var(--clr-success-border);
+    border-radius: 50%;
+    color: var(--clr-success);
+}
+
+.success-card__icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+.success-card__title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--clr-success);
+}
+
+.success-card__details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.95rem;
+    color: var(--clr-text);
+}
+
+.success-card__details strong {
+    color: var(--clr-text-muted);
+    font-weight: 600;
+}
+
+.success-card__hint {
+    font-size: 0.85rem;
+    color: var(--clr-text-muted);
+    margin-top: 0.25rem;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 480px) {
+    body {
+        padding: 1.25rem 0.75rem;
+    }
+
+    .card {
+        padding: 1.25rem;
+    }
+
+    .reception-header__title {
+        font-size: 1.35rem;
+    }
+
+    .product-card__details {
+        grid-template-columns: 1fr;
+    }
+
+    .stock-display__number {
+        font-size: 1.6rem;
+    }
+
+    .receipt-form__input {
+        font-size: 1.25rem;
+    }
+}
