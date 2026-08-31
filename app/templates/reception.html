@@ -6,18 +6,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Recepción de mercancía</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reception.css') }}">
 </head>
 
 <body>
 
-    <h1>Recepción de mercancía</h1>
+    <div class="reception-wrapper">
 
-    <label for="barcode">Código de barras</label>
+        <header class="reception-header">
+            <h1 class="reception-header__title">Recepción de mercancía</h1>
+            <p class="reception-header__subtitle">Escanee el código de barras del producto</p>
+        </header>
 
-    <input type="text" id="barcode" placeholder="Escanee un producto" autocomplete="off" autofocus>
+        <section class="card scanner-zone">
+            <div class="scanner-zone__icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+                    <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                    <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+                    <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                    <line x1="7" y1="12" x2="17" y2="12" />
+                    <line x1="7" y1="8" x2="17" y2="8" />
+                    <line x1="7" y1="16" x2="17" y2="16" />
+                </svg>
+            </div>
+            <label class="scanner-zone__label" for="barcode">Código de barras</label>
+            <input class="scanner-zone__input" type="text" id="barcode"
+                placeholder="Escanee o escriba un código" autocomplete="off" autofocus>
+        </section>
 
-    <div id="product-info">
-        <p>Esperando producto...</p>
+        <div id="product-info" class="card">
+            <div class="status-message status-message--idle">
+                Esperando producto...
+            </div>
+        </div>
+
     </div>
 
     <script src="{{ url_for('static', filename='js/reception.js') }}"></script>
