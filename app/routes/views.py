@@ -11,3 +11,8 @@ def reception_page():
 @views_bp.get("/admin")
 def admin_page():
     return render_template("admin.html")
+
+
+@views_bp.get("/history")
+def history_page():
+    return render_template("history.html")
