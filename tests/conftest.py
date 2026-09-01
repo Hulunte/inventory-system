@@ -61,6 +61,62 @@ from app import create_app
 from app.extensions import db as _db
 from config import TestConfig
 
+import flask_sqlalchemy.session as _fss_session
+import sqlalchemy as _sa
+import sqlalchemy.exc as _sa_exc
+import sqlalchemy.orm as _sa_orm
+
+_original_fss_get_bind = _fss_session.Session.get_bind
+
+
+def _patched_get_bind(self, mapper=None, clause=None, bind=None, **kwargs):
+    """Respect explicit bind from configure(), needed for test isolation.
+
+    Flask-SQLAlchemy's get_bind() always resolves to the engine via
+    ``engines[None]``, ignoring any bind set via session.configure().
+    This patch checks the Session's bind attribute (set by
+    configure(bind=...)) before falling through to the engine fallback,
+    so test fixtures can bind db.session to a Connection with
+    join_transaction_mode="create_savepoint".
+    """
+    if bind is not None:
+        return bind
+
+    engines = self._db.engines
+
+    if mapper is not None:
+        try:
+            mapper = _sa.inspect(mapper)
+        except _sa_exc.NoInspectionAvailable as e:
+            if isinstance(mapper, type):
+                raise _sa_orm.exc.UnmappedClassError(mapper) from e
+            raise
+
+        engine = _fss_session._clause_to_engine(mapper.local_table, engines)
+
+        if engine is not None:
+            return engine
+
+    if clause is not None:
+        engine = _fss_session._clause_to_engine(clause, engines)
+
+        if engine is not None:
+            return engine
+
+    session_bind = self.bind
+    if session_bind is not None:
+        return session_bind
+
+    if None in engines:
+        return engines[None]
+
+    return _original_fss_get_bind(
+        self, mapper=mapper, clause=clause, bind=bind, **kwargs
+    )
+
+
+_fss_session.Session.get_bind = _patched_get_bind
+
 
 @pytest.fixture(scope="session")
 def app():
@@ -79,6 +135,17 @@ def client(app):
 @pytest.fixture(scope="function")
 def db_session(app):
     with app.app_context():
-        _db.session.begin_nested()
+        connection = _db.engine.connect()
+        transaction = connection.begin()
+
+        _db.session.configure(
+            bind=connection,
+            join_transaction_mode="create_savepoint",
+        )
+        _db.session.remove()
+
         yield _db.session
-        _db.session.rollback()
+
+        _db.session.close()
+        transaction.rollback()
+        connection.close()

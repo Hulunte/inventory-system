@@ -16,3 +16,8 @@ def admin_page():
 @views_bp.get("/history")
 def history_page():
     return render_template("history.html")
+
+
+@views_bp.get("/reports")
+def reports_page():
+    return render_template("reports.html")

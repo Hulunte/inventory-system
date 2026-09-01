@@ -1,0 +1,311 @@
+/* ============================================================
+   Reports - Harvest Tracking System
+   ============================================================ */
+
+/* ---------- Reset & Base ---------- */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --clr-bg: #f0f2f5;
+    --clr-surface: #ffffff;
+    --clr-text: #1a1a2e;
+    --clr-text-muted: #6b7280;
+    --clr-border: #d1d5db;
+    --clr-primary: #2563eb;
+    --clr-primary-hover: #1d4ed8;
+    --clr-primary-light: #eff6ff;
+    --clr-success: #16a34a;
+    --clr-success-bg: #f0fdf4;
+    --clr-success-border: #bbf7d0;
+    --clr-error: #dc2626;
+    --clr-error-bg: #fef2f2;
+    --clr-error-border: #fecaca;
+    --clr-warning: #d97706;
+    --clr-warning-bg: #fffbeb;
+    --clr-warning-border: #fde68a;
+    --clr-row-hover: #f8fafc;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+    --transition: 0.2s ease;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, sans-serif;
+    background-color: var(--clr-bg);
+    color: var(--clr-text);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+}
+
+/* ---------- Layout ---------- */
+
+.reports-wrapper {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* ---------- Header ---------- */
+
+.reports-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.reports-header__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--clr-text);
+    letter-spacing: -0.01em;
+}
+
+.reports-header__nav {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.reports-header__link {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--clr-primary);
+    text-decoration: none;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--clr-primary);
+    border-radius: var(--radius-sm);
+    transition: background var(--transition), color var(--transition);
+}
+
+.reports-header__link:hover {
+    background: var(--clr-primary);
+    color: #ffffff;
+}
+
+/* ---------- Card ---------- */
+
+.card {
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.75rem;
+}
+
+.card__title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--clr-text);
+    margin-bottom: 1.25rem;
+}
+
+/* ---------- Filters ---------- */
+
+.filters__row {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 1rem;
+    align-items: end;
+}
+
+.filters__row--secondary {
+    grid-template-columns: 1fr;
+    margin-top: 0.75rem;
+}
+
+.filters__group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.filters__group--wide {
+    width: 100%;
+}
+
+.filters__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--clr-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.filters__input {
+    font-size: 0.95rem;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    background: var(--clr-surface);
+    color: var(--clr-text);
+}
+
+.filters__input:focus {
+    border-color: var(--clr-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.filters__button {
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--clr-primary);
+    color: #ffffff;
+    cursor: pointer;
+    transition: background var(--transition);
+    white-space: nowrap;
+    align-self: end;
+}
+
+.filters__button:hover {
+    background: var(--clr-primary-hover);
+}
+
+.filters__warning {
+    margin-top: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.85rem;
+    color: var(--clr-warning);
+    background: var(--clr-warning-bg);
+    border: 1px solid var(--clr-warning-border);
+    border-radius: var(--radius-sm);
+}
+
+/* ---------- Stats Bar ---------- */
+
+.stats-bar {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.stats-bar__item {
+    font-size: 0.9rem;
+    color: var(--clr-text-muted);
+}
+
+.stats-bar__item strong {
+    color: var(--clr-text);
+    font-weight: 700;
+}
+
+/* ---------- Table ---------- */
+
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.summary-table th {
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--clr-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--clr-border);
+}
+
+.summary-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.summary-table tbody tr:hover {
+    background: var(--clr-row-hover);
+}
+
+.num {
+    text-align: right;
+}
+
+.bold {
+    font-weight: 700;
+}
+
+.mono {
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.summary-total {
+    font-weight: 700;
+    border-top: 2px solid var(--clr-border);
+    border-bottom: none;
+}
+
+.summary-total td {
+    padding: 0.75rem;
+}
+
+/* ---------- Empty State ---------- */
+
+.empty-state {
+    text-align: center;
+    color: var(--clr-text-muted);
+    font-size: 0.9rem;
+    padding: 1.5rem 0;
+}
+
+.empty-state--error {
+    color: var(--clr-error);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 640px) {
+    .reports-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .filters__row {
+        grid-template-columns: 1fr;
+    }
+
+    .filters__button {
+        width: 100%;
+    }
+
+    .stats-bar {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .summary-table {
+        font-size: 0.8rem;
+    }
+
+    .summary-table th,
+    .summary-table td {
+        padding: 0.5rem;
+    }
+}

@@ -67,7 +67,10 @@ body {
 /* ---------- Header ---------- */
 
 .reception-header {
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .reception-header__title {
@@ -77,10 +80,31 @@ body {
     letter-spacing: -0.01em;
 }
 
+.reception-header__nav {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.reception-header__link {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--clr-primary);
+    text-decoration: none;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--clr-primary);
+    border-radius: var(--radius-sm);
+    transition: background var(--transition), color var(--transition);
+}
+
+.reception-header__link:hover {
+    background: var(--clr-primary);
+    color: #ffffff;
+}
+
 .reception-header__subtitle {
     font-size: 0.9rem;
     color: var(--clr-text-muted);
-    margin-top: 0.25rem;
+    margin-top: 0.15rem;
 }
 
 /* ---------- Card ---------- */

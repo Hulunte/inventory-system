@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Reportes de cosecha</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reports.css') }}">
+</head>
+
+<body>
+
+    <div class="reports-wrapper">
+
+        <header class="reports-header">
+            <h1 class="reports-header__title">Reportes de cosecha</h1>
+            <nav class="reports-header__nav">
+                <a href="/" class="reports-header__link">Recepción</a>
+                <a href="/admin" class="reports-header__link">Administración</a>
+                <a href="/history" class="reports-header__link">Historial</a>
+            </nav>
+        </header>
+
+        <section class="card filters">
+            <div class="filters__row">
+                <div class="filters__group">
+                    <label class="filters__label" for="start-date">Fecha inicio</label>
+                    <input class="filters__input" type="date" id="start-date">
+                </div>
+
+                <div class="filters__group">
+                    <label class="filters__label" for="end-date">Fecha final</label>
+                    <input class="filters__input" type="date" id="end-date">
+                </div>
+
+                <button class="filters__button" type="button" id="query-btn">
+                    Consultar
+                </button>
+            </div>
+
+            <div class="filters__row filters__row--secondary">
+                <div class="filters__group filters__group--wide">
+                    <label class="filters__label" for="search-input">Buscar trabajador</label>
+                    <input class="filters__input" type="text" id="search-input"
+                        placeholder="Nombre o código..." autocomplete="off">
+                </div>
+            </div>
+
+            <div id="range-warning" class="filters__warning" hidden>
+                El rango seleccionado supera los 365 días. La consulta puede tardar más de lo habitual.
+            </div>
+        </section>
+
+        <section class="card" id="summary-section" hidden>
+            <h2 class="card__title" id="summary-title">Resumen del período</h2>
+
+            <div id="stats-bar" class="stats-bar"></div>
+
+            <div id="summary-content">
+                <p class="empty-state">Seleccione un rango de fechas.</p>
+            </div>
+        </section>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+</body>
+
+</html>
