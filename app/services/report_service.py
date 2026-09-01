@@ -45,6 +45,7 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
         .filter(
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
+            HarvestEntry.voided == False,
         )
         .group_by(Worker.id, Worker.name, Worker.barcode)
         .order_by(Worker.name.asc())

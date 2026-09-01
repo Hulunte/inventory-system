@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
@@ -12,7 +13,16 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     HARVEST_TIMEZONE = ZoneInfo(os.getenv("HARVEST_TIMEZONE", "UTC"))
 
+    ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH")
+
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=4)
+    SESSION_REFRESH_EACH_REQUEST = False
+
 
 class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL")
+    ADMIN_PASSWORD_HASH = "pbkdf2:sha256:600000$test_salt$test_hash"

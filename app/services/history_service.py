@@ -51,6 +51,7 @@ def get_daily_summary(operational_date, query_filter=None, tz=None):
         .filter(
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
+            HarvestEntry.voided == False,
         )
         .group_by(Worker.id, Worker.name, Worker.barcode)
         .order_by(Worker.name.asc())
@@ -105,6 +106,7 @@ def get_worker_entries(worker_id, operational_date, tz=None):
             HarvestEntry.worker_id == worker_id,
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
+            HarvestEntry.voided == False,
         )
         .order_by(HarvestEntry.created_at.asc())
         .all()

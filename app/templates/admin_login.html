@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ session.get('csrf_token', '') }}">
+
+    <title>Acceso Administrativo</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+
+<body>
+
+    <div class="login-wrapper">
+
+        <header class="login-header">
+            <h1 class="login-header__title">Acceso Administrativo</h1>
+        </header>
+
+        <section class="card login-card">
+            <form id="login-form" class="form" autocomplete="off">
+                <div class="form__group">
+                    <label class="form__label" for="password">Contraseña</label>
+                    <input class="form__input" type="password" id="password"
+                        placeholder="Contraseña de administrador" autocomplete="off" autofocus>
+                </div>
+
+                <div id="login-message" class="form__message" hidden></div>
+
+                <button class="form__button" type="submit" id="login-submit">
+                    Ingresar
+                </button>
+            </form>
+        </section>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='js/admin_login.js') }}"></script>
+</body>
+
+</html>

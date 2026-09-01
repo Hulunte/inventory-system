@@ -133,6 +133,31 @@ def client(app):
 
 
 @pytest.fixture(scope="function")
+def admin_client(app, db_session):
+    from werkzeug.security import generate_password_hash
+
+    app.config["ADMIN_PASSWORD_HASH"] = generate_password_hash("test-password-123")
+
+    connection = db_session.get_bind()
+    transaction = connection.begin_nested()
+
+    client = app.test_client()
+
+    session_response = client.get("/api/admin/session")
+    csrf_token = session_response.get_json()["csrf_token"]
+
+    client.post(
+        "/api/admin/login",
+        json={"password": "test-password-123"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    yield client
+
+    transaction.rollback()
+
+
+@pytest.fixture(scope="function")
 def db_session(app):
     with app.app_context():
         connection = _db.engine.connect()
