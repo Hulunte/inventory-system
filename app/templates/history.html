@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Historial de cosecha</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}">
+</head>
+
+<body>
+
+    <div class="history-wrapper">
+
+        <header class="history-header">
+            <h1 class="history-header__title">Historial de cosecha</h1>
+            <nav class="history-header__nav">
+                <a href="/" class="history-header__link">Recepción</a>
+                <a href="/admin" class="history-header__link">Administración</a>
+            </nav>
+        </header>
+
+        <section class="card filters">
+            <div class="filters__row">
+                <div class="filters__group">
+                    <label class="filters__label" for="date-input">Fecha</label>
+                    <input class="filters__input" type="date" id="date-input">
+                </div>
+
+                <div class="filters__group">
+                    <label class="filters__label" for="search-input">Buscar trabajador</label>
+                    <input class="filters__input" type="text" id="search-input"
+                        placeholder="Nombre o código..." autocomplete="off">
+                </div>
+            </div>
+        </section>
+
+        <section class="card" id="summary-section">
+            <h2 class="card__title" id="summary-title">Resumen del día</h2>
+
+            <div id="summary-content">
+                <p class="empty-state">Cargando...</p>
+            </div>
+        </section>
+
+        <section class="card" id="detail-section" hidden>
+            <h2 class="card__title" id="detail-title">Detalle de tandas</h2>
+
+            <div id="detail-content">
+                <p class="empty-state">Seleccione un trabajador</p>
+            </div>
+        </section>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='js/history.js') }}"></script>
+</body>
+
+</html>
