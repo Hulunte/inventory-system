@@ -4,8 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ session.get('csrf_token', '') }}">
 
-    <title>Administración de trabajadores</title>
+    <title>Administración</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
 </head>
@@ -15,11 +16,12 @@
     <div class="admin-wrapper">
 
         <header class="admin-header">
-            <h1 class="admin-header__title">Administración de trabajadores</h1>
+            <h1 class="admin-header__title">Administración</h1>
             <nav class="admin-header__nav">
                 <a href="/" class="admin-header__link">Recepción</a>
                 <a href="/history" class="admin-header__link">Historial</a>
                 <a href="/reports" class="admin-header__link">Reportes</a>
+                <button id="logout-btn" class="btn btn--logout" type="button">Cerrar sesión</button>
             </nav>
         </header>
 
@@ -65,6 +67,40 @@
             </div>
         </section>
 
+        <section class="card" id="entries-section">
+            <div class="list-header">
+                <h2 class="card__title">Movimientos de cosecha</h2>
+
+                <div class="search-zone">
+                    <label class="search-zone__label" for="entry-date-input">Fecha</label>
+                    <input class="search-zone__input" type="date" id="entry-date-input">
+                    <label class="search-zone__label" for="entry-search-input">Buscar</label>
+                    <input class="search-zone__input" type="text" id="entry-search-input"
+                        placeholder="Nombre o código..." autocomplete="off">
+                </div>
+            </div>
+
+            <div id="entries-list" class="entries-list">
+                <p class="entries-list__empty">Cargando movimientos...</p>
+            </div>
+        </section>
+
+    </div>
+
+    <div id="void-modal" class="modal" hidden>
+        <div class="modal__content">
+            <h3 class="modal__title">Anular movimiento</h3>
+            <p class="modal__text" id="void-modal-text"></p>
+            <div class="form__group">
+                <label class="form__label" for="void-reason-input">Motivo de anulación *</label>
+                <textarea class="form__input" id="void-reason-input" rows="3"
+                    placeholder="Describa el motivo de la anulación"></textarea>
+            </div>
+            <div class="modal__actions">
+                <button class="btn btn--cancel" type="button" id="void-cancel-btn">Cancelar</button>
+                <button class="btn btn--danger" type="button" id="void-confirm-btn">Confirmar anulación</button>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/admin.js') }}"></script>

@@ -46,6 +46,7 @@ def get_daily_total(worker_id, operational_date=None, tz=None):
             HarvestEntry.worker_id == worker_id,
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
+            HarvestEntry.voided == False,
         )
         .scalar()
     )
@@ -54,4 +55,4 @@ def get_daily_total(worker_id, operational_date=None, tz=None):
 
 
 def get_all_entries():
-    return HarvestEntry.query.order_by(HarvestEntry.created_at.desc()).all()
+    return HarvestEntry.query.filter_by(voided=False).order_by(HarvestEntry.created_at.desc()).all()

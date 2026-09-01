@@ -133,59 +133,61 @@ class TestInactiveWorkerHarvest:
 
 
 class TestAdminEndpoints:
-    def test_list_workers(self, client, db_session):
+    def test_list_workers(self, admin_client, db_session):
         w1 = Worker(barcode="LW001", name="Alpha Worker")
         w2 = Worker(barcode="LW002", name="Beta Worker")
         db_session.add_all([w1, w2])
         db_session.commit()
 
-        response = client.get("/api/admin/workers")
+        response = admin_client.get("/api/admin/workers")
         assert response.status_code == 200
         data = response.get_json()
         assert len(data) >= 2
 
-    def test_list_workers_includes_inactive(self, client, db_session):
+    def test_list_workers_includes_inactive(self, admin_client, db_session):
         w1 = Worker(barcode="LW003", name="Active One", active=True)
         w2 = Worker(barcode="LW004", name="Inactive One", active=False)
         db_session.add_all([w1, w2])
         db_session.commit()
 
-        response = client.get("/api/admin/workers")
+        response = admin_client.get("/api/admin/workers")
         data = response.get_json()
         names = [w["name"] for w in data]
         assert "Active One" in names
         assert "Inactive One" in names
 
-    def test_search_workers_endpoint(self, client, db_session):
+    def test_search_workers_endpoint(self, admin_client, db_session):
         worker = Worker(barcode="SW001", name="Searchable Person")
         db_session.add(worker)
         db_session.commit()
 
-        response = client.get("/api/admin/workers?q=Searchable")
+        response = admin_client.get("/api/admin/workers?q=Searchable")
         assert response.status_code == 200
         data = response.get_json()
         assert len(data) == 1
         assert data[0]["name"] == "Searchable Person"
 
-    def test_get_worker_by_id_endpoint(self, client, db_session):
+    def test_get_worker_by_id_endpoint(self, admin_client, db_session):
         worker = Worker(barcode="GW001", name="Get By ID")
         db_session.add(worker)
         db_session.commit()
 
-        response = client.get(f"/api/admin/workers/{worker.id}")
+        response = admin_client.get(f"/api/admin/workers/{worker.id}")
         assert response.status_code == 200
         data = response.get_json()
         assert data["barcode"] == "GW001"
         assert data["name"] == "Get By ID"
 
-    def test_get_worker_by_id_not_found_endpoint(self, client, db_session):
-        response = client.get("/api/admin/workers/99999")
+    def test_get_worker_by_id_not_found_endpoint(self, admin_client, db_session):
+        response = admin_client.get("/api/admin/workers/99999")
         assert response.status_code == 404
 
-    def test_create_worker_endpoint(self, client, db_session):
-        response = client.post(
+    def test_create_worker_endpoint(self, admin_client, db_session):
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.post(
             "/api/admin/workers",
             json={"name": "New Worker", "barcode": "CW001"},
+            headers={"X-CSRF-Token": csrf},
         )
         assert response.status_code == 201
         data = response.get_json()
@@ -193,72 +195,96 @@ class TestAdminEndpoints:
         assert data["barcode"] == "CW001"
         assert data["active"] is True
 
-    def test_create_worker_empty_name(self, client, db_session):
-        response = client.post(
+    def test_create_worker_empty_name(self, admin_client, db_session):
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.post(
             "/api/admin/workers",
             json={"name": "", "barcode": "EN001"},
+            headers={"X-CSRF-Token": csrf},
         )
         assert response.status_code == 400
 
-    def test_create_worker_empty_barcode(self, client, db_session):
-        response = client.post(
+    def test_create_worker_empty_barcode(self, admin_client, db_session):
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.post(
             "/api/admin/workers",
             json={"name": "No Barcode", "barcode": ""},
+            headers={"X-CSRF-Token": csrf},
         )
         assert response.status_code == 400
 
-    def test_create_worker_whitespace_only(self, client, db_session):
-        response = client.post(
+    def test_create_worker_whitespace_only(self, admin_client, db_session):
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.post(
             "/api/admin/workers",
             json={"name": "   ", "barcode": "   "},
+            headers={"X-CSRF-Token": csrf},
         )
         assert response.status_code == 400
 
-    def test_create_worker_duplicate_barcode(self, client, db_session):
+    def test_create_worker_duplicate_barcode(self, admin_client, db_session):
         worker = Worker(barcode="DU001", name="Existing")
         db_session.add(worker)
         db_session.commit()
 
-        response = client.post(
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.post(
             "/api/admin/workers",
             json={"name": "Duplicate", "barcode": "DU001"},
+            headers={"X-CSRF-Token": csrf},
         )
         assert response.status_code == 409
 
-    def test_deactivate_worker_endpoint(self, client, db_session):
+    def test_deactivate_worker_endpoint(self, admin_client, db_session):
         worker = Worker(barcode="DE001", name="Deactivate Endpoint")
         db_session.add(worker)
         db_session.commit()
 
-        response = client.patch(f"/api/admin/workers/{worker.id}/deactivate")
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.patch(
+            f"/api/admin/workers/{worker.id}/deactivate",
+            headers={"X-CSRF-Token": csrf},
+        )
         assert response.status_code == 200
         data = response.get_json()
         assert data["active"] is False
 
-    def test_activate_worker_endpoint(self, client, db_session):
+    def test_activate_worker_endpoint(self, admin_client, db_session):
         worker = Worker(barcode="AE001", name="Activate Endpoint", active=False)
         db_session.add(worker)
         db_session.commit()
 
-        response = client.patch(f"/api/admin/workers/{worker.id}/activate")
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.patch(
+            f"/api/admin/workers/{worker.id}/activate",
+            headers={"X-CSRF-Token": csrf},
+        )
         assert response.status_code == 200
         data = response.get_json()
         assert data["active"] is True
 
-    def test_deactivate_nonexistent_endpoint(self, client, db_session):
-        response = client.patch("/api/admin/workers/99999/deactivate")
+    def test_deactivate_nonexistent_endpoint(self, admin_client, db_session):
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.patch(
+            "/api/admin/workers/99999/deactivate",
+            headers={"X-CSRF-Token": csrf},
+        )
         assert response.status_code == 404
 
-    def test_activate_nonexistent_endpoint(self, client, db_session):
-        response = client.patch("/api/admin/workers/99999/activate")
+    def test_activate_nonexistent_endpoint(self, admin_client, db_session):
+        csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+        response = admin_client.patch(
+            "/api/admin/workers/99999/activate",
+            headers={"X-CSRF-Token": csrf},
+        )
         assert response.status_code == 404
 
-    def test_inactive_worker_cannot_register_harvest_endpoint(self, client, db_session):
+    def test_inactive_worker_cannot_register_harvest_endpoint(self, admin_client, db_session):
         worker = Worker(barcode="IH003", name="Inactive Harvest Endpoint", active=False)
         db_session.add(worker)
         db_session.commit()
 
-        response = client.post(
+        response = admin_client.post(
             "/api/harvest/entries",
             json={"barcode": "IH003", "weight_kg": 5.0},
         )
