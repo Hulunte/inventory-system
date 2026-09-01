@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Administración de trabajadores</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+
+<body>
+
+    <div class="admin-wrapper">
+
+        <header class="admin-header">
+            <h1 class="admin-header__title">Administración de trabajadores</h1>
+            <nav class="admin-header__nav">
+                <a href="/" class="admin-header__link">Recepción de cosecha</a>
+            </nav>
+        </header>
+
+        <section class="card" id="create-section">
+            <h2 class="card__title">Registrar trabajador</h2>
+
+            <form id="create-form" class="form" autocomplete="off">
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="create-name">Nombre</label>
+                        <input class="form__input" type="text" id="create-name"
+                            placeholder="Nombre del trabajador" autocomplete="off">
+                    </div>
+
+                    <div class="form__group">
+                        <label class="form__label" for="create-barcode">Código de barras</label>
+                        <input class="form__input" type="text" id="create-barcode"
+                            placeholder="Código único" autocomplete="off">
+                    </div>
+                </div>
+
+                <div id="create-message" class="form__message" hidden></div>
+
+                <button class="form__button" type="submit" id="create-submit">
+                    Registrar
+                </button>
+            </form>
+        </section>
+
+        <section class="card" id="list-section">
+            <div class="list-header">
+                <h2 class="card__title">Trabajadores</h2>
+
+                <div class="search-zone">
+                    <label class="search-zone__label" for="search-input">Buscar</label>
+                    <input class="search-zone__input" type="text" id="search-input"
+                        placeholder="Nombre o código..." autocomplete="off">
+                </div>
+            </div>
+
+            <div id="worker-list" class="worker-list">
+                <p class="worker-list__empty">Cargando trabajadores...</p>
+            </div>
+        </section>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+
+</html>

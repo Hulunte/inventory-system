@@ -19,10 +19,12 @@ def create_app(config_class=None):
 
     from app.routes.workers import workers_bp
     from app.routes.harvest import harvest_bp
+    from app.routes.admin import admin_bp
     from app.routes.views import views_bp
 
     app.register_blueprint(workers_bp)
     app.register_blueprint(harvest_bp)
+    app.register_blueprint(admin_bp)
     app.register_blueprint(views_bp)
 
     @app.get("/api/health")
