@@ -25,13 +25,37 @@ def _format_decimal(value):
     return str(d.quantize(Decimal("0.001")))
 
 
+def date_range_to_utc(start_date, end_date, tz=None):
+    """Convert local date range to UTC boundaries [start_utc, end_utc).
+
+    The range is inclusive at the start and exclusive at the end of the next day.
+    """
+    if tz is None:
+        tz = _get_tz()
+    start_utc = datetime.combine(start_date, time.min, tzinfo=tz).astimezone(timezone.utc)
+    end_utc = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=tz).astimezone(timezone.utc)
+    return start_utc, end_utc
+
+
+def get_week_ranges(reference_date):
+    """Return (current_week, previous_week) as ((monday, sunday), ...) for a given date.
+
+    Each week runs Monday–Sunday inclusive.
+    """
+    monday_current = reference_date - timedelta(days=reference_date.weekday())
+    sunday_current = monday_current + timedelta(days=6)
+
+    monday_previous = monday_current - timedelta(days=7)
+    sunday_previous = monday_previous + timedelta(days=6)
+
+    return (monday_current, sunday_current), (monday_previous, sunday_previous)
+
+
 def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
     if tz is None:
         tz = _get_tz()
 
-    start_utc = datetime.combine(start_date, time.min, tzinfo=tz).astimezone(timezone.utc)
-    end_of_end_day = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=tz)
-    end_utc = end_of_end_day.astimezone(timezone.utc)
+    start_utc, end_utc = date_range_to_utc(start_date, end_date, tz)
 
     q = (
         db.session.query(
