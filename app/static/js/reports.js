@@ -157,7 +157,7 @@ async function loadReport() {
         `;
 
     } catch (error) {
-        summaryContent.innerHTML = `<p class="empty-state empty-state--error">${error.message}</p>`;
+        summaryContent.innerHTML = `<p class="empty-state empty-state--error">${escapeHtml(error.message)}</p>`;
         statsBar.innerHTML = "";
     }
 }
@@ -167,4 +167,59 @@ function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
+}
+
+
+// --- Week buttons ---
+
+const weekCurrentBtn = document.getElementById("week-current-btn");
+const weekPreviousBtn = document.getElementById("week-previous-btn");
+
+if (weekCurrentBtn) {
+    weekCurrentBtn.addEventListener("click", () => {
+        const cfg = window.REPORTS_CONFIG;
+        if (cfg) {
+            startDateInput.value = cfg.currentWeekStart;
+            endDateInput.value = cfg.currentWeekEnd;
+            checkRangeWarning();
+            loadReport();
+        }
+    });
+}
+
+if (weekPreviousBtn) {
+    weekPreviousBtn.addEventListener("click", () => {
+        const cfg = window.REPORTS_CONFIG;
+        if (cfg) {
+            startDateInput.value = cfg.previousWeekStart;
+            endDateInput.value = cfg.previousWeekEnd;
+            checkRangeWarning();
+            loadReport();
+        }
+    });
+}
+
+
+// --- Export button ---
+
+const exportBtn = document.getElementById("export-btn");
+
+if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+        const start = startDateInput.value;
+        const end = endDateInput.value;
+
+        if (!start || !end) {
+            alert("Selecciona un rango de fechas antes de exportar.");
+            return;
+        }
+
+        const q = searchInput.value.trim();
+        let url = `/api/reports/harvest/export?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+        if (q) {
+            url += `&q=${encodeURIComponent(q)}`;
+        }
+
+        window.location.href = url;
+    });
 }
