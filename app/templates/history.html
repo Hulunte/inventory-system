@@ -56,6 +56,11 @@
 
     </div>
 
+    <script>
+        window.HISTORY_CONFIG = {
+            operationalToday: {{ operational_today | tojson }}
+        };
+    </script>
     <script src="{{ url_for('static', filename='js/history.js') }}"></script>
 </body>
 

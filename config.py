@@ -29,3 +29,4 @@ class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL")
     ADMIN_PASSWORD_HASH = "pbkdf2:sha256:600000$test_salt$test_hash"
+    HARVEST_TIMEZONE = ZoneInfo("America/Chihuahua")

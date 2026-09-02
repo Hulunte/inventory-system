@@ -7,6 +7,12 @@ from app.services.report_service import get_week_ranges
 views_bp = Blueprint("views", __name__)
 
 
+def _operational_today():
+    """Return today's date in HARVEST_TIMEZONE as a date object."""
+    tz = current_app.config["HARVEST_TIMEZONE"]
+    return dt.now(tz).date()
+
+
 @views_bp.get("/")
 def reception_page():
     return render_template("reception.html")
@@ -23,23 +29,23 @@ def admin_login_page():
 def admin_page():
     if not session.get("admin"):
         return redirect(url_for("views.admin_login_page"))
-    return render_template("admin.html")
+    return render_template("admin.html", operational_today=_operational_today().isoformat())
 
 
 @views_bp.get("/history")
 def history_page():
-    return render_template("history.html")
+    return render_template("history.html", operational_today=_operational_today().isoformat())
 
 
 @views_bp.get("/reports")
 def reports_page():
-    tz = current_app.config["HARVEST_TIMEZONE"]
-    today = dt.now(tz).date()
+    today = _operational_today()
     (monday_current, sunday_current), (monday_previous, sunday_previous) = get_week_ranges(today)
 
     return render_template(
         "reports.html",
         is_admin=bool(session.get("admin")),
+        operational_today=today.isoformat(),
         current_week_start=monday_current.isoformat(),
         current_week_end=sunday_current.isoformat(),
         previous_week_start=monday_previous.isoformat(),

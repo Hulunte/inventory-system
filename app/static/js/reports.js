@@ -12,16 +12,15 @@ let searchTimeout = null;
 
 
 function initDates() {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    endDateInput.value = `${yyyy}-${mm}-${dd}`;
+    const cfg = window.REPORTS_CONFIG;
+    if (!cfg || !cfg.operationalToday) return;
 
-    const firstOfMonth = new Date(yyyy, today.getMonth(), 1);
-    const mmFirst = String(firstOfMonth.getMonth() + 1).padStart(2, "0");
-    const ddFirst = String(firstOfMonth.getDate()).padStart(2, "0");
-    startDateInput.value = `${yyyy}-${mmFirst}-${ddFirst}`;
+    const todayStr = cfg.operationalToday;
+    endDateInput.value = todayStr;
+
+    const yyyy = todayStr.slice(0, 4);
+    const mm = todayStr.slice(5, 7);
+    startDateInput.value = `${yyyy}-${mm}-01`;
 }
 
 initDates();

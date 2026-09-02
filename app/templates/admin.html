@@ -123,6 +123,11 @@
         </div>
     </div>
 
+    <script>
+        window.ADMIN_CONFIG = {
+            operationalToday: {{ operational_today | tojson }}
+        };
+    </script>
     <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 </body>
 

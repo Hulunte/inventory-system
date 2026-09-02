@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.models.worker import Worker
@@ -402,3 +402,13 @@ class TestHistoryEndpoints:
             )
             data = response.get_json()
             assert data["entries"][0]["created_at"] == "14:00"
+
+
+class TestHistoryPageOperationalToday:
+    def test_history_page_operational_today(self, client, monkeypatch):
+        monkeypatch.setattr("app.routes.views._operational_today", lambda: date(2026, 6, 17))
+        response = client.get("/history")
+        assert response.status_code == 200
+        html = response.data.decode()
+        assert 'HISTORY_CONFIG' in html
+        assert 'operationalToday: "2026-06-17"' in html

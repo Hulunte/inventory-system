@@ -1,4 +1,5 @@
 import pytest
+from datetime import date
 from decimal import Decimal
 
 from app.models.worker import Worker
@@ -289,3 +290,13 @@ class TestAdminEndpoints:
             json={"barcode": "IH003", "weight_kg": 5.0},
         )
         assert response.status_code == 404
+
+
+class TestAdminPageOperationalToday:
+    def test_admin_page_operational_today(self, admin_client, monkeypatch):
+        monkeypatch.setattr("app.routes.views._operational_today", lambda: date(2026, 6, 17))
+        response = admin_client.get("/admin")
+        assert response.status_code == 200
+        html = response.data.decode()
+        assert 'ADMIN_CONFIG' in html
+        assert 'operationalToday: "2026-06-17"' in html

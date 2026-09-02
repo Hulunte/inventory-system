@@ -361,3 +361,15 @@ class TestReportEndpoints:
         response = client.get("/reports")
         assert response.status_code == 200
         assert b"Reportes de cosecha" in response.data
+
+    def test_report_page_operational_today(self, client, monkeypatch):
+        monkeypatch.setattr("app.routes.views._operational_today", lambda: date(2026, 6, 17))
+        response = client.get("/reports")
+        assert response.status_code == 200
+        html = response.data.decode()
+        assert 'REPORTS_CONFIG' in html
+        assert 'operationalToday: "2026-06-17"' in html
+        assert 'currentWeekStart: "2026-06-15"' in html
+        assert 'currentWeekEnd: "2026-06-21"' in html
+        assert 'previousWeekStart: "2026-06-08"' in html
+        assert 'previousWeekEnd: "2026-06-14"' in html

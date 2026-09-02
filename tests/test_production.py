@@ -1,5 +1,6 @@
 import os
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -587,3 +588,15 @@ class TestProductionAppFactory:
         app = create_app()
         assert app.debug is False
         assert app.config.get("DEBUG") is not True
+
+
+class TestTestConfigTimezone:
+    """Verifica que TestConfig declara una zona horaria explícita y determinista."""
+
+    def test_test_config_has_explicit_harvest_timezone(self):
+        """TestConfig.HARVEST_TIMEZONE debe ser ZoneInfo("America/Chihuahua")."""
+        from config import TestConfig
+
+        tz = TestConfig.HARVEST_TIMEZONE
+        assert isinstance(tz, ZoneInfo)
+        assert str(tz) == "America/Chihuahua"

@@ -272,7 +272,7 @@ function renderEntry(entry) {
     const voidInfo = entry.voided
         ? `<div class="entry-row__void-info">
                <span class="entry-row__void-reason">Motivo: ${escapeHtml(entry.void_reason)}</span>
-               <span class="entry-row__void-date">Anulado: ${entry.voided_at ? new Date(entry.voided_at).toLocaleString("es-MX") : ""}</span>
+               <span class="entry-row__void-date">Anulado: ${entry.voided_at_local ? escapeHtml(entry.voided_at_local) : ""}</span>
            </div>`
         : "";
     const voidButton = entry.voided
@@ -366,11 +366,10 @@ voidConfirmBtn.addEventListener("click", async () => {
 });
 
 
-const today = new Date();
-const year = today.getFullYear();
-const month = String(today.getMonth() + 1).padStart(2, "0");
-const day = String(today.getDate()).padStart(2, "0");
-entryDateInput.value = `${year}-${month}-${day}`;
+const todayStr = window.ADMIN_CONFIG ? window.ADMIN_CONFIG.operationalToday : null;
+if (todayStr) {
+    entryDateInput.value = todayStr;
+}
 
 const backupCreateBtn = document.getElementById("backup-create-btn");
 const backupMessage = document.getElementById("backup-message");

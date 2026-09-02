@@ -86,6 +86,7 @@
 
     <script>
         window.REPORTS_CONFIG = {
+            operationalToday: {{ operational_today | tojson }},
             currentWeekStart: {{ current_week_start | tojson }},
             currentWeekEnd: {{ current_week_end | tojson }},
             previousWeekStart: {{ previous_week_start | tojson }},
