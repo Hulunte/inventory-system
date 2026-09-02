@@ -12,6 +12,7 @@ from app.services.admin_service import (
     verify_admin_password,
     void_harvest_entry,
 )
+from app.services.backup_service import create_backup, list_backups
 from app.services.worker_service import (
     activate_worker,
     create_worker,
@@ -267,3 +268,29 @@ def void_entry(entry_id):
         "voided_at": entry.voided_at.isoformat() if entry.voided_at else None,
         "void_reason": entry.void_reason,
     })
+
+
+@admin_bp.get("/api/admin/backups")
+@require_admin
+def get_backups():
+    data, error = list_backups()
+    if error:
+        return jsonify({"error": error}), 500
+    return jsonify(data)
+
+
+@admin_bp.post("/api/admin/backups")
+@require_admin
+@require_csrf
+def create_backup_endpoint():
+    info, error = create_backup()
+    if error:
+        if "no está configurado" in error:
+            return jsonify({"error": error}), 400
+        if "Ya hay un respaldo" in error:
+            return jsonify({"error": error}), 409
+        return jsonify({"error": error}), 500
+    return jsonify({
+        "message": "Respaldo creado exitosamente",
+        "backup": info,
+    }), 201
