@@ -1,6 +1,12 @@
 const barcodeInput = document.getElementById("barcode");
 const productInfo = document.getElementById("product-info");
 
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 barcodeInput.addEventListener("keydown", async (event) => {
     if (event.key !== "Enter") {
         return;
@@ -30,7 +36,7 @@ barcodeInput.addEventListener("keydown", async (event) => {
             productInfo.innerHTML = `
                 <div class="status-message status-message--error">
                     <p><strong>Trabajador no encontrado.</strong></p>
-                    <p>Código: ${barcode}</p>
+                    <p>Código: ${escapeHtml(barcode)}</p>
                 </div>
             `;
 
@@ -72,18 +78,18 @@ async function showWorker(worker) {
 
         productInfo.innerHTML = `
             <div class="worker-card">
-                <h2 class="worker-card__name">${worker.name}</h2>
+                <h2 class="worker-card__name">${escapeHtml(worker.name)}</h2>
 
                 <div class="worker-card__details">
                     <div class="worker-card__detail">
                         <span class="worker-card__label">Código</span>
-                        <span class="worker-card__value">${worker.barcode}</span>
+                        <span class="worker-card__value">${escapeHtml(worker.barcode)}</span>
                     </div>
 
                     <div class="worker-card__detail worker-card__detail--full">
                         <span class="worker-card__label">Total del día</span>
                         <div class="stock-display">
-                            <span class="stock-display__number">${daily.daily_total}</span>
+                            <span class="stock-display__number">${escapeHtml(daily.daily_total)}</span>
                             <span class="stock-display__unit">kg</span>
                         </div>
                     </div>
@@ -172,9 +178,9 @@ async function showWorker(worker) {
                         </div>
                         <h2 class="success-card__title">Pesada registrada correctamente</h2>
                         <div class="success-card__details">
-                            <p><strong>Trabajador:</strong> ${worker.name}</p>
-                            <p><strong>Peso registrado:</strong> ${result.weight_kg} kg</p>
-                            <p><strong>Total del día:</strong> ${result.daily_total} kg</p>
+                            <p><strong>Trabajador:</strong> ${escapeHtml(worker.name)}</p>
+                            <p><strong>Peso registrado:</strong> ${escapeHtml(result.weight_kg)} kg</p>
+                            <p><strong>Total del día:</strong> ${escapeHtml(result.daily_total)} kg</p>
                         </div>
                         <p class="success-card__hint">Preparado para el siguiente trabajador.</p>
                     </div>
