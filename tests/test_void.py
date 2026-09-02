@@ -420,3 +420,47 @@ class TestCheckConstraint:
         db_session.add(entry)
         with pytest.raises(Exception):
             db_session.commit()
+
+
+class TestVoidedAtLocal:
+    """Tests for the voided_at_local field in admin listing responses."""
+
+    def test_non_voided_entry_has_voided_at_local_none(self, admin_client, db_session):
+        worker = Worker(barcode="VAL02", name="Active Local")
+        db_session.add(worker)
+        db_session.flush()
+
+        entry = HarvestEntry(worker_id=worker.id, weight_kg=Decimal("3.000"),
+                             created_at=datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc))
+        db_session.add(entry)
+        db_session.commit()
+
+        response = admin_client.get(f"/api/admin/harvest-entries?q=VAL02&date=2026-06-15")
+        data = response.get_json()
+        entries = data["entries"]
+        active = [e for e in entries if not e["voided"]]
+        assert len(active) == 1
+        assert active[0]["voided_at_local"] is None
+        assert active[0]["voided_at"] is None
+
+    def test_voided_at_local_cross_day_boundary(self, admin_client, db_session):
+        """05:59:59 UTC on Jun 16 = 23:59:59 Chihuahua on Jun 15."""
+        worker = Worker(barcode="VAL04", name="Cross Day")
+        db_session.add(worker)
+        db_session.flush()
+
+        voided_utc = datetime(2026, 6, 16, 5, 59, 59, tzinfo=timezone.utc)
+        entry = HarvestEntry(worker_id=worker.id, weight_kg=Decimal("1.000"),
+                             created_at=datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc),
+                             voided=True, voided_at=voided_utc,
+                             void_reason="Cross day test")
+        db_session.add(entry)
+        db_session.commit()
+
+        response = admin_client.get(f"/api/admin/harvest-entries?q=VAL04&date=2026-06-15")
+        data = response.get_json()
+        entries = data["entries"]
+        matching = [e for e in entries if e["worker"]["barcode"] == "VAL04"]
+        assert len(matching) == 1
+        assert matching[0]["voided_at_local"] == "15/06/2026 23:59:59"
+        assert matching[0]["voided_at"] is not None

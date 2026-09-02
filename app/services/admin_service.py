@@ -15,6 +15,13 @@ def verify_admin_password(password):
     return check_password_hash(password_hash, password)
 
 
+def _format_voided_at_local(voided_at_utc, tz):
+    """Convert a UTC voided_at timestamp to a local DD/MM/YYYY HH:MM:SS string."""
+    if voided_at_utc is None:
+        return None
+    return voided_at_utc.astimezone(tz).strftime("%d/%m/%Y %H:%M:%S")
+
+
 def get_harvest_entries_for_admin(operational_date, query_filter=None, tz=None):
     if tz is None:
         tz = current_app.config["HARVEST_TIMEZONE"]
@@ -60,6 +67,7 @@ def get_harvest_entries_for_admin(operational_date, query_filter=None, tz=None):
             "created_at_local": local_dt.strftime("%H:%M"),
             "voided": entry.voided,
             "voided_at": entry.voided_at.isoformat() if entry.voided_at else None,
+            "voided_at_local": _format_voided_at_local(entry.voided_at, tz),
             "void_reason": entry.void_reason,
         })
 
