@@ -372,7 +372,95 @@ const month = String(today.getMonth() + 1).padStart(2, "0");
 const day = String(today.getDate()).padStart(2, "0");
 entryDateInput.value = `${year}-${month}-${day}`;
 
+const backupCreateBtn = document.getElementById("backup-create-btn");
+const backupMessage = document.getElementById("backup-message");
+const backupLatest = document.getElementById("backup-latest");
+const backupLatestInfo = document.getElementById("backup-latest-info");
+const backupList = document.getElementById("backup-list");
+
+function renderBackup(backup) {
+    return `
+        <div class="backup-row">
+            <span class="backup-row__filename">${escapeHtml(backup.filename)}</span>
+            <span class="backup-row__size">${escapeHtml(backup.size_human)}</span>
+            <span class="backup-row__date">${escapeHtml(backup.created_at)}</span>
+        </div>
+    `;
+}
+
+async function loadBackups() {
+    backupList.innerHTML = `<p class="backup-list__empty">Cargando respaldos...</p>`;
+
+    try {
+        const response = await fetch("/api/admin/backups");
+
+        if (response.status === 401) {
+            window.location.href = "/admin/login";
+            return;
+        }
+
+        if (!response.ok) {
+            const result = await response.json();
+            throw new Error(result.error || "Error al cargar respaldos");
+        }
+
+        const data = await response.json();
+        const backups = data.backups || [];
+
+        if (data.latest) {
+            backupLatest.hidden = false;
+            backupLatestInfo.innerHTML = `
+                <span class="backup-latest__filename">${escapeHtml(data.latest.filename)}</span>
+                <span class="backup-latest__size">${escapeHtml(data.latest.size_human)}</span>
+                <span class="backup-latest__date">${escapeHtml(data.latest.created_at)}</span>
+            `;
+        } else {
+            backupLatest.hidden = true;
+            backupLatestInfo.innerHTML = "";
+        }
+
+        if (backups.length === 0) {
+            backupList.innerHTML = `<p class="backup-list__empty">No hay respaldos disponibles.</p>`;
+            return;
+        }
+
+        backupList.innerHTML = backups.map(renderBackup).join("");
+
+    } catch (error) {
+        backupList.innerHTML = `<p class="backup-list__empty backup-list__empty--error">${error.message}</p>`;
+    }
+}
+
+backupCreateBtn.addEventListener("click", async () => {
+    backupCreateBtn.disabled = true;
+    backupCreateBtn.textContent = "Creando respaldo...";
+    showMessage(backupMessage, "Creando respaldo...", "success");
+
+    try {
+        const response = await fetch("/api/admin/backups", {
+            method: "POST",
+            headers: apiHeaders(),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || "No fue posible crear el respaldo");
+        }
+
+        showMessage(backupMessage, "Respaldo creado exitosamente.", "success");
+        loadBackups();
+
+    } catch (error) {
+        showMessage(backupMessage, error.message, "error");
+    } finally {
+        backupCreateBtn.disabled = false;
+        backupCreateBtn.textContent = "Crear respaldo";
+    }
+});
+
 initCsrfToken().then(() => {
     loadWorkers();
     loadEntries();
+    loadBackups();
 });

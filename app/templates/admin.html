@@ -85,6 +85,26 @@
             </div>
         </section>
 
+        <section class="card" id="backups-section">
+            <div class="list-header">
+                <h2 class="card__title">Respaldos</h2>
+                <button class="form__button" type="button" id="backup-create-btn">
+                    Crear respaldo
+                </button>
+            </div>
+
+            <div id="backup-message" class="form__message" hidden></div>
+
+            <div id="backup-latest" class="backup-latest" hidden>
+                <h3 class="backup-latest__title">Último respaldo</h3>
+                <div id="backup-latest-info" class="backup-latest__info"></div>
+            </div>
+
+            <div id="backup-list" class="backup-list">
+                <p class="backup-list__empty">Cargando respaldos...</p>
+            </div>
+        </section>
+
     </div>
 
     <div id="void-modal" class="modal" hidden>
