@@ -107,6 +107,26 @@ class TestHarvestEndpoints:
         response = client.get("/api/workers/NONEXISTENT")
         assert response.status_code == 404
 
+    def test_inactive_worker_returns_404(self, client, db_session):
+        worker = Worker(barcode="W100", name="Inactive Worker")
+        worker.active = False
+        db_session.add(worker)
+        db_session.commit()
+
+        response = client.get("/api/workers/W100")
+        assert response.status_code == 404
+
+    def test_list_workers_endpoint_removed(self, client):
+        response = client.get("/api/workers")
+        assert response.status_code == 404
+
+    def test_create_worker_endpoint_removed(self, client):
+        response = client.post(
+            "/api/workers",
+            json={"barcode": "W999", "name": "Should Not Work"},
+        )
+        assert response.status_code == 404
+
     def test_register_harvest_endpoint(self, client, db_session):
         worker = Worker(barcode="W008", name="Sofia Martin")
         db_session.add(worker)
