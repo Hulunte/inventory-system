@@ -134,6 +134,7 @@ class TestPgDumpNotFound:
 class TestPgDumpPath:
     def test_default_pg_dump_path(self, admin_client, app, tmp_path):
         app.config["BACKUP_DIR"] = str(tmp_path)
+        app.config["PG_DUMP_PATH"] = "pg_dump"
         with mock.patch("app.services.backup_service.subprocess.run") as mock_run:
             def fake_run(cmd, env=None, **kwargs):
                 assert cmd[0] == "pg_dump"
