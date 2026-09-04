@@ -146,3 +146,20 @@ def deactivate_product(product_id):
     product.active = False
     db.session.commit()
     return product
+
+
+def get_active_products_for_reception():
+    products = (
+        Product.query
+        .filter(Product.active.is_(True))
+        .order_by(func.lower(Product.name).asc())
+        .all()
+    )
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "rate_per_kg": _format_rate(p.rate_per_kg),
+        }
+        for p in products
+    ]

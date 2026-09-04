@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index
+from sqlalchemy import CheckConstraint
 
 from app.extensions import db
 
@@ -11,7 +11,8 @@ class HarvestEntry(db.Model):
         CheckConstraint("weight_kg > 0", name="ck_harvest_entries_weight_positive"),
         CheckConstraint(
             "(NOT voided AND voided_at IS NULL AND void_reason IS NULL) OR "
-            "(voided AND voided_at IS NOT NULL AND void_reason IS NOT NULL AND LENGTH(TRIM(void_reason)) > 0)",
+            "(voided AND voided_at IS NOT NULL AND void_reason IS NOT NULL "
+            "AND LENGTH(TRIM(void_reason)) > 0)",
             name="ck_harvest_entries_voided_consistency",
         ),
         CheckConstraint(
@@ -40,7 +41,10 @@ class HarvestEntry(db.Model):
     weight_kg = db.Column(db.Numeric(10, 3), nullable=False)
 
     product_id = db.Column(
-        db.Integer, db.ForeignKey("products.id"), nullable=True, index=True
+        db.Integer,
+        db.ForeignKey("products.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
     )
     product_name_snapshot = db.Column(db.String(100), nullable=True)
     rate_per_kg_snapshot = db.Column(db.Numeric(8, 2), nullable=True)

@@ -2,43 +2,41 @@ from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request
 
+from app.exceptions import ProductUnavailableError
 from app.services.harvest_service import (
     get_all_entries,
     get_daily_total,
     get_worker_by_barcode,
     register_harvest,
 )
+from app.services.product_service import get_active_products_for_reception
 
 harvest_bp = Blueprint("harvest", __name__)
+
+_ALLOWED_ENTRY_FIELDS = {"barcode", "weight_kg", "product_id"}
+
+
+def _format_snapshot_value(value):
+    if value is None:
+        return None
+    return str(value.quantize(Decimal("0.01")))
 
 
 @harvest_bp.get("/api/products/active")
 def list_active_products():
-    from app.models.product import Product
-    from sqlalchemy import func
-
-    products = (
-        Product.query
-        .filter(Product.active == True)
-        .order_by(func.lower(Product.name).asc())
-        .all()
-    )
-    return jsonify([
-        {
-            "id": p.id,
-            "name": p.name,
-            "rate_per_kg": str(p.rate_per_kg.quantize(Decimal("0.01"))),
-        }
-        for p in products
-    ])
+    return jsonify(get_active_products_for_reception())
 
 
 @harvest_bp.post("/api/harvest/entries")
 def create_entry():
-    data = request.get_json()
+    data = request.get_json(silent=True)
 
-    if not data:
-        return jsonify({"error": "Invalid JSON body"}), 400
+    if not isinstance(data, dict):
+        return jsonify({"error": "Cuerpo JSON inválido"}), 400
+
+    unknown = set(data.keys()) - _ALLOWED_ENTRY_FIELDS
+    if unknown:
+        return jsonify({"error": f"Campos desconocidos: {', '.join(sorted(unknown))}"}), 400
 
     barcode = data.get("barcode")
     weight_kg_raw = data.get("weight_kg")
@@ -50,24 +48,41 @@ def create_entry():
     if product_id_raw is None:
         return jsonify({"error": "product_id is required"}), 400
 
-    if not isinstance(product_id_raw, int) or isinstance(product_id_raw, bool):
+    if isinstance(product_id_raw, bool) or not isinstance(product_id_raw, int):
         return jsonify({"error": "product_id must be a positive integer"}), 400
 
     if product_id_raw <= 0:
         return jsonify({"error": "product_id must be a positive integer"}), 400
+
+    if isinstance(weight_kg_raw, bool):
+        return jsonify({"error": "weight_kg must be a valid number"}), 400
 
     try:
         weight_kg = Decimal(str(weight_kg_raw))
     except (InvalidOperation, TypeError, ValueError):
         return jsonify({"error": "weight_kg must be a valid number"}), 400
 
+    if weight_kg.is_nan() or weight_kg.is_infinite():
+        return jsonify({"error": "weight_kg must be a valid number"}), 400
+
     if weight_kg <= 0:
         return jsonify({"error": "weight_kg must be greater than zero"}), 400
 
-    entry, daily_total = register_harvest(barcode, weight_kg, product_id_raw)
+    if weight_kg.as_tuple().exponent < -3:
+        return jsonify({"error": "weight_kg must have at most 3 decimal places"}), 400
+
+    try:
+        entry, daily_total = register_harvest(barcode, weight_kg, product_id_raw)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except ProductUnavailableError:
+        return jsonify({
+            "error": "El producto seleccionado ya no está disponible.",
+            "code": "product_unavailable",
+        }), 409
 
     if entry is None:
-        return jsonify({"error": "Worker or product not found"}), 404
+        return jsonify({"error": "Trabajador no encontrado"}), 404
 
     worker = entry.worker
 
@@ -83,8 +98,8 @@ def create_entry():
                 },
                 "product_id": entry.product_id,
                 "product_name": entry.product_name_snapshot,
-                "rate_per_kg": str(entry.rate_per_kg_snapshot.quantize(Decimal("0.01"))) if entry.rate_per_kg_snapshot is not None else None,
-                "amount_mxn": str(entry.amount_mxn.quantize(Decimal("0.01"))) if entry.amount_mxn is not None else None,
+                "rate_per_kg": _format_snapshot_value(entry.rate_per_kg_snapshot),
+                "amount_mxn": _format_snapshot_value(entry.amount_mxn),
                 "daily_total": str(daily_total),
                 "created_at": entry.created_at.isoformat(),
             }
@@ -130,8 +145,8 @@ def list_entries():
                 },
                 "product_id": entry.product_id,
                 "product_name": entry.product_name_snapshot,
-                "rate_per_kg": str(entry.rate_per_kg_snapshot.quantize(Decimal("0.01"))) if entry.rate_per_kg_snapshot is not None else None,
-                "amount_mxn": str(entry.amount_mxn.quantize(Decimal("0.01"))) if entry.amount_mxn is not None else None,
+                "rate_per_kg": _format_snapshot_value(entry.rate_per_kg_snapshot),
+                "amount_mxn": _format_snapshot_value(entry.amount_mxn),
                 "created_at": entry.created_at.isoformat(),
             }
             for entry in entries

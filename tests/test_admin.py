@@ -112,13 +112,18 @@ class TestWorkerService:
 
 class TestInactiveWorkerHarvest:
     def test_inactive_worker_cannot_register_harvest(self, db_session):
+        from decimal import Decimal
+        from app.models.product import Product
+
         worker = Worker(barcode="IH001", name="Inactive Harvester", active=False)
         db_session.add(worker)
+        product = Product(name="IHProd", rate_per_kg=Decimal("2.00"))
+        db_session.add(product)
         db_session.commit()
 
         from app.services.harvest_service import register_harvest
 
-        entry, daily_total = register_harvest("IH001", Decimal("5.000"), 1)
+        entry, daily_total = register_harvest("IH001", Decimal("5.000"), product.id)
         assert entry is None
         assert daily_total is None
 
@@ -281,13 +286,22 @@ class TestAdminEndpoints:
         assert response.status_code == 404
 
     def test_inactive_worker_cannot_register_harvest_endpoint(self, admin_client, db_session):
+        from decimal import Decimal
+        from app.models.product import Product
+
         worker = Worker(barcode="IH003", name="Inactive Harvest Endpoint", active=False)
         db_session.add(worker)
+        product = Product(name="IHProd3", rate_per_kg=Decimal("2.00"))
+        db_session.add(product)
         db_session.commit()
 
         response = admin_client.post(
             "/api/harvest/entries",
-            json={"barcode": "IH003", "weight_kg": 5.0, "product_id": 1},
+            json={
+                "barcode": "IH003",
+                "weight_kg": 5.0,
+                "product_id": product.id,
+            },
         )
         assert response.status_code == 404
 

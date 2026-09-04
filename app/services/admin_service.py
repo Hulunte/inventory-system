@@ -1,6 +1,5 @@
-from decimal import Decimal
-
 from datetime import datetime, time, timedelta, timezone
+from decimal import Decimal
 
 from flask import current_app
 from werkzeug.security import check_password_hash

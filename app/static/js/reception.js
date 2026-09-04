@@ -3,7 +3,7 @@ const productInfo = document.getElementById("product-info");
 const productButtonsContainer = document.getElementById("product-buttons");
 const productWarning = document.getElementById("product-warning");
 
-const STORAGE_KEY = "selectedProductId";
+const STORAGE_KEY = "inventory.selectedProductId";
 let selectedProductId = null;
 let allProducts = [];
 
@@ -23,16 +23,21 @@ async function loadProducts() {
     } catch (error) {
         console.error(error);
         allProducts = [];
-    }
-
-    if (allProducts.length === 0) {
-        productButtonsContainer.style.display = "none";
-        productWarning.style.display = "";
+        productButtonsContainer.hidden = true;
+        productWarning.hidden = false;
+        productWarning.textContent = "No fue posible cargar los productos. Intente nuevamente.";
         return;
     }
 
-    productButtonsContainer.style.display = "";
-    productWarning.style.display = "none";
+    if (allProducts.length === 0) {
+        productButtonsContainer.hidden = true;
+        productWarning.hidden = false;
+        productWarning.textContent = "No hay productos activos. Contacte al administrador.";
+        return;
+    }
+
+    productButtonsContainer.hidden = false;
+    productWarning.hidden = true;
 
     renderProductButtons();
     restoreSelection();
@@ -73,7 +78,9 @@ function restoreSelection() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw !== null) {
-            storedId = Number.parseInt(raw, 10);
+            if (/^\d+$/.test(raw)) {
+                storedId = Number.parseInt(raw, 10);
+            }
         }
     } catch (_e) {
         /* storage unavailable */
@@ -131,7 +138,7 @@ barcodeInput.addEventListener("keydown", async (event) => {
             productInfo.innerHTML = `
                 <div class="status-message status-message--error">
                     <p><strong>Trabajador no encontrado.</strong></p>
-                    <p>C&oacute;digo: ${escapeHtml(barcode)}</p>
+                    <p>Código: ${escapeHtml(barcode)}</p>
                 </div>
             `;
 
@@ -177,12 +184,12 @@ async function showWorker(worker) {
 
                 <div class="worker-card__details">
                     <div class="worker-card__detail">
-                        <span class="worker-card__label">C&oacute;digo</span>
+                        <span class="worker-card__label">Código</span>
                         <span class="worker-card__value">${escapeHtml(worker.barcode)}</span>
                     </div>
 
                     <div class="worker-card__detail worker-card__detail--full">
-                        <span class="worker-card__label">Total del d&iacute;a</span>
+                        <span class="worker-card__label">Total del día</span>
                         <div class="stock-display">
                             <span class="stock-display__number">${escapeHtml(daily.daily_total)}</span>
                             <span class="stock-display__unit">kg</span>
@@ -239,10 +246,10 @@ async function showWorker(worker) {
                 return;
             }
 
-            const weightKg = parseFloat(weightInput.value);
+            const weightKg = weightInput.value.trim();
 
-            if (!weightKg || weightKg <= 0) {
-                alert("Ingrese un peso v&aacute;lido mayor a cero.");
+            if (!weightKg || !weightInput.checkValidity()) {
+                alert("Ingrese un peso válido mayor a cero.");
                 weightInput.focus();
                 return;
             }
@@ -266,6 +273,25 @@ async function showWorker(worker) {
                 const result = await response.json();
 
                 if (!response.ok) {
+                    if (result.code === "product_unavailable") {
+                        selectedProductId = null;
+                        try {
+                            localStorage.removeItem(STORAGE_KEY);
+                        } catch (_e) {
+                            /* storage unavailable */
+                        }
+                        await loadProducts();
+                        alert("El producto seleccionado ya no está disponible. Seleccione otro producto.");
+                        registerButton.disabled = false;
+                        registerButton.textContent = "Registrar pesada";
+                        requestAnimationFrame(() => {
+                            setTimeout(() => {
+                                weightInput.focus({ preventScroll: true });
+                                weightInput.select();
+                            }, 150);
+                        });
+                        return;
+                    }
                     throw new Error(result.error || "No fue posible registrar la pesada");
                 }
 
@@ -285,9 +311,10 @@ async function showWorker(worker) {
                         <div class="success-card__details">
                             <p><strong>Trabajador:</strong> ${escapeHtml(worker.name)}</p>
                             <p><strong>Producto:</strong> ${escapeHtml(result.product_name)}</p>
+                            <p><strong>Precio aplicado:</strong> $${escapeHtml(result.rate_per_kg)} MXN/kg</p>
                             <p><strong>Peso registrado:</strong> ${escapeHtml(result.weight_kg)} kg</p>
                             ${amountDisplay}
-                            <p><strong>Total del d&iacute;a:</strong> ${escapeHtml(result.daily_total)} kg</p>
+                            <p><strong>Total del día:</strong> ${escapeHtml(result.daily_total)} kg</p>
                         </div>
                         <p class="success-card__hint">Preparado para el siguiente trabajador.</p>
                     </div>

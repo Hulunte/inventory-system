@@ -3,6 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import func
 
+from app.exceptions import ProductUnavailableError
 from app.extensions import db
 from app.models.harvest_entry import HarvestEntry
 from app.models.product import Product
@@ -13,18 +14,39 @@ def get_worker_by_barcode(barcode):
     return Worker.query.filter_by(barcode=barcode, active=True).first()
 
 
+def _validate_product_id(product_id):
+    if isinstance(product_id, bool):
+        raise ValueError("product_id must be a valid integer")
+    if not isinstance(product_id, int):
+        raise ValueError("product_id must be a valid integer")
+    if product_id <= 0:
+        raise ValueError("product_id must be a positive integer")
+
+
 def register_harvest(barcode, weight_kg, product_id):
+    _validate_product_id(product_id)
+
     worker = get_worker_by_barcode(barcode)
 
     if worker is None:
         return None, None
 
-    product = db.session.get(Product, product_id)
-    if product is None or not product.active:
-        return None, None
+    product = (
+        Product.query
+        .filter(Product.id == product_id, Product.active.is_(True))
+        .with_for_update()
+        .one_or_none()
+    )
+
+    if product is None:
+        raise ProductUnavailableError(
+            "El producto seleccionado ya no está disponible."
+        )
 
     rate_snapshot = Decimal(str(product.rate_per_kg))
-    amount = (weight_kg * rate_snapshot).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    amount = (weight_kg * rate_snapshot).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
 
     entry = HarvestEntry(
         worker_id=worker.id,
@@ -70,4 +92,9 @@ def get_daily_total(worker_id, operational_date=None, tz=None):
 
 
 def get_all_entries():
-    return HarvestEntry.query.filter_by(voided=False).order_by(HarvestEntry.created_at.desc()).all()
+    return (
+        HarvestEntry.query
+        .filter_by(voided=False)
+        .order_by(HarvestEntry.created_at.desc())
+        .all()
+    )
