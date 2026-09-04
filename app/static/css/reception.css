@@ -12,6 +12,10 @@
     padding: 0;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 :root {
     --clr-bg: #f0f2f5;
     --clr-surface: #ffffff;
@@ -440,4 +444,57 @@ body {
     .receipt-form__input {
         font-size: 1.25rem;
     }
+}
+
+/* ---------- Product Selector ---------- */
+
+.product-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.product-selector__title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--clr-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.product-selector__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.product-btn {
+    flex: 1 1 auto;
+    min-width: 120px;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--clr-text);
+    background: var(--clr-surface);
+    border: 2px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color var(--transition), background var(--transition), color var(--transition);
+    text-align: center;
+}
+
+.product-btn:hover {
+    border-color: var(--clr-primary);
+    background: var(--clr-primary-light);
+}
+
+.product-btn--selected {
+    border-color: var(--clr-primary);
+    background: var(--clr-primary);
+    color: #ffffff;
+}
+
+.product-btn--selected:hover {
+    background: var(--clr-primary-hover);
+    border-color: var(--clr-primary-hover);
 }
