@@ -13,6 +13,15 @@ from app.services.admin_service import (
     void_harvest_entry,
 )
 from app.services.backup_service import create_backup, list_backups
+from app.services.product_service import (
+    DuplicateProductError,
+    activate_product,
+    create_product,
+    deactivate_product,
+    search_products,
+    serialize_product,
+    update_product,
+)
 from app.services.worker_service import (
     activate_worker,
     create_worker,
@@ -204,6 +213,111 @@ def activate(worker_id):
             "active": worker.active,
         }
     )
+
+
+@admin_bp.get("/api/admin/products")
+@require_admin
+def list_products():
+    query = request.args.get("q", "").strip() or None
+    products = search_products(query)
+    return jsonify([serialize_product(p) for p in products])
+
+
+@admin_bp.post("/api/admin/products")
+@require_admin
+@require_csrf
+def create_product_endpoint():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
+    if not data:
+        return jsonify({"error": "Request body must not be empty"}), 400
+
+    KNOWN_FIELDS = {"name", "rate_per_kg"}
+    unknown = set(data.keys()) - KNOWN_FIELDS
+    if unknown:
+        return jsonify({"error": "Unknown fields: " + ", ".join(sorted(unknown))}), 400
+
+    if "name" not in data:
+        return jsonify({"error": "name is required"}), 400
+    if "rate_per_kg" not in data:
+        return jsonify({"error": "rate_per_kg is required"}), 400
+
+    if data["name"] is None:
+        return jsonify({"error": "name must not be null"}), 400
+    if data["rate_per_kg"] is None:
+        return jsonify({"error": "rate_per_kg must not be null"}), 400
+
+    try:
+        product = create_product(name=data["name"], rate_per_kg=data["rate_per_kg"])
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except DuplicateProductError:
+        return jsonify({"error": "El producto ya existe."}), 409
+
+    return jsonify(serialize_product(product)), 201
+
+
+@admin_bp.patch("/api/admin/products/<int:product_id>")
+@require_admin
+@require_csrf
+def update_product_endpoint(product_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
+    if not data:
+        return jsonify({"error": "Request body must not be empty"}), 400
+
+    KNOWN_FIELDS = {"name", "rate_per_kg"}
+    unknown = set(data.keys()) - KNOWN_FIELDS
+    if unknown:
+        return jsonify({"error": "Unknown fields: " + ", ".join(sorted(unknown))}), 400
+
+    if "name" not in data and "rate_per_kg" not in data:
+        return jsonify({"error": "At least one field (name, rate_per_kg) is required"}), 400
+
+    if "name" in data and data["name"] is None:
+        return jsonify({"error": "name must not be null"}), 400
+    if "rate_per_kg" in data and data["rate_per_kg"] is None:
+        return jsonify({"error": "rate_per_kg must not be null"}), 400
+
+    kwargs = {}
+    if "name" in data:
+        kwargs["name"] = data["name"]
+    if "rate_per_kg" in data:
+        kwargs["rate_per_kg"] = data["rate_per_kg"]
+
+    try:
+        product = update_product(product_id, **kwargs)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except DuplicateProductError:
+        return jsonify({"error": "El producto ya existe."}), 409
+
+    if product is None:
+        return jsonify({"error": "Product not found"}), 404
+
+    return jsonify(serialize_product(product)), 200
+
+
+@admin_bp.patch("/api/admin/products/<int:product_id>/activate")
+@require_admin
+@require_csrf
+def activate_product_endpoint(product_id):
+    product = activate_product(product_id)
+    if product is None:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(serialize_product(product)), 200
+
+
+@admin_bp.patch("/api/admin/products/<int:product_id>/deactivate")
+@require_admin
+@require_csrf
+def deactivate_product_endpoint(product_id):
+    product = deactivate_product(product_id)
+    if product is None:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(serialize_product(product)), 200
 
 
 @admin_bp.get("/api/admin/harvest-entries")
