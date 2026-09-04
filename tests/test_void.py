@@ -327,11 +327,14 @@ class TestVoidDefaultValues:
         assert fetched.void_reason is None
 
     def test_new_entry_defaults_not_voided(self, db_session):
+        from app.models.product import Product
         worker = Worker(barcode="VD002", name="New Default")
         db_session.add(worker)
+        product = Product(name="VoidProd", rate_per_kg=Decimal("2.00"))
+        db_session.add(product)
         db_session.commit()
 
-        entry, _ = register_harvest("VD002", Decimal("3.000"))
+        entry, _ = register_harvest("VD002", Decimal("3.000"), product.id)
         assert entry.voided is False
         assert entry.voided_at is None
         assert entry.void_reason is None

@@ -118,7 +118,7 @@ class TestInactiveWorkerHarvest:
 
         from app.services.harvest_service import register_harvest
 
-        entry, daily_total = register_harvest("IH001", Decimal("5.000"))
+        entry, daily_total = register_harvest("IH001", Decimal("5.000"), 1)
         assert entry is None
         assert daily_total is None
 
@@ -287,7 +287,7 @@ class TestAdminEndpoints:
 
         response = admin_client.post(
             "/api/harvest/entries",
-            json={"barcode": "IH003", "weight_kg": 5.0},
+            json={"barcode": "IH003", "weight_kg": 5.0, "product_id": 1},
         )
         assert response.status_code == 404
 

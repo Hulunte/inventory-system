@@ -1,11 +1,106 @@
 const barcodeInput = document.getElementById("barcode");
 const productInfo = document.getElementById("product-info");
+const productButtonsContainer = document.getElementById("product-buttons");
+const productWarning = document.getElementById("product-warning");
+
+const STORAGE_KEY = "selectedProductId";
+let selectedProductId = null;
+let allProducts = [];
 
 function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
 }
+
+async function loadProducts() {
+    try {
+        const response = await fetch("/api/products/active");
+        if (!response.ok) {
+            throw new Error("Error loading products");
+        }
+        allProducts = await response.json();
+    } catch (error) {
+        console.error(error);
+        allProducts = [];
+    }
+
+    if (allProducts.length === 0) {
+        productButtonsContainer.style.display = "none";
+        productWarning.style.display = "";
+        return;
+    }
+
+    productButtonsContainer.style.display = "";
+    productWarning.style.display = "none";
+
+    renderProductButtons();
+    restoreSelection();
+}
+
+function renderProductButtons() {
+    let html = "";
+    for (const product of allProducts) {
+        const isSelected = selectedProductId === product.id;
+        html += `<button type="button"
+            class="product-btn${isSelected ? " product-btn--selected" : ""}"
+            data-product-id="${escapeHtml(String(product.id))}"
+            aria-pressed="${isSelected}"
+        >${escapeHtml(product.name)} — $${escapeHtml(product.rate_per_kg)}/kg</button>`;
+    }
+    productButtonsContainer.innerHTML = html;
+
+    productButtonsContainer.querySelectorAll(".product-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const id = Number.parseInt(btn.dataset.productId, 10);
+            selectProduct(id);
+        });
+    });
+}
+
+function selectProduct(productId) {
+    selectedProductId = productId;
+    try {
+        localStorage.setItem(STORAGE_KEY, String(productId));
+    } catch (_e) {
+        /* storage unavailable */
+    }
+    renderProductButtons();
+}
+
+function restoreSelection() {
+    let storedId = null;
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw !== null) {
+            storedId = Number.parseInt(raw, 10);
+        }
+    } catch (_e) {
+        /* storage unavailable */
+    }
+
+    if (storedId === null || Number.isNaN(storedId)) {
+        selectedProductId = null;
+        renderProductButtons();
+        return;
+    }
+
+    const exists = allProducts.some((p) => p.id === storedId);
+    if (exists) {
+        selectedProductId = storedId;
+    } else {
+        selectedProductId = null;
+        try {
+            localStorage.removeItem(STORAGE_KEY);
+        } catch (_e) {
+            /* storage unavailable */
+        }
+    }
+    renderProductButtons();
+}
+
+loadProducts();
+
 
 barcodeInput.addEventListener("keydown", async (event) => {
     if (event.key !== "Enter") {
@@ -36,7 +131,7 @@ barcodeInput.addEventListener("keydown", async (event) => {
             productInfo.innerHTML = `
                 <div class="status-message status-message--error">
                     <p><strong>Trabajador no encontrado.</strong></p>
-                    <p>Código: ${escapeHtml(barcode)}</p>
+                    <p>C&oacute;digo: ${escapeHtml(barcode)}</p>
                 </div>
             `;
 
@@ -82,12 +177,12 @@ async function showWorker(worker) {
 
                 <div class="worker-card__details">
                     <div class="worker-card__detail">
-                        <span class="worker-card__label">Código</span>
+                        <span class="worker-card__label">C&oacute;digo</span>
                         <span class="worker-card__value">${escapeHtml(worker.barcode)}</span>
                     </div>
 
                     <div class="worker-card__detail worker-card__detail--full">
-                        <span class="worker-card__label">Total del día</span>
+                        <span class="worker-card__label">Total del d&iacute;a</span>
                         <div class="stock-display">
                             <span class="stock-display__number">${escapeHtml(daily.daily_total)}</span>
                             <span class="stock-display__unit">kg</span>
@@ -139,10 +234,15 @@ async function showWorker(worker) {
         });
 
         registerButton.addEventListener("click", async () => {
+            if (selectedProductId === null) {
+                alert("Seleccione un producto antes de registrar.");
+                return;
+            }
+
             const weightKg = parseFloat(weightInput.value);
 
             if (!weightKg || weightKg <= 0) {
-                alert("Ingrese un peso válido mayor a cero.");
+                alert("Ingrese un peso v&aacute;lido mayor a cero.");
                 weightInput.focus();
                 return;
             }
@@ -158,7 +258,8 @@ async function showWorker(worker) {
                     },
                     body: JSON.stringify({
                         barcode: worker.barcode,
-                        weight_kg: weightKg
+                        weight_kg: weightKg,
+                        product_id: selectedProductId
                     })
                 });
 
@@ -167,6 +268,10 @@ async function showWorker(worker) {
                 if (!response.ok) {
                     throw new Error(result.error || "No fue posible registrar la pesada");
                 }
+
+                const amountDisplay = result.amount_mxn
+                    ? `<p><strong>Importe:</strong> $${escapeHtml(result.amount_mxn)} MXN</p>`
+                    : "";
 
                 productInfo.innerHTML = `
                     <div class="success-card">
@@ -179,8 +284,10 @@ async function showWorker(worker) {
                         <h2 class="success-card__title">Pesada registrada correctamente</h2>
                         <div class="success-card__details">
                             <p><strong>Trabajador:</strong> ${escapeHtml(worker.name)}</p>
+                            <p><strong>Producto:</strong> ${escapeHtml(result.product_name)}</p>
                             <p><strong>Peso registrado:</strong> ${escapeHtml(result.weight_kg)} kg</p>
-                            <p><strong>Total del día:</strong> ${escapeHtml(result.daily_total)} kg</p>
+                            ${amountDisplay}
+                            <p><strong>Total del d&iacute;a:</strong> ${escapeHtml(result.daily_total)} kg</p>
                         </div>
                         <p class="success-card__hint">Preparado para el siguiente trabajador.</p>
                     </div>

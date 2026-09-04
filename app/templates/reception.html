@@ -17,12 +17,25 @@
         <header class="reception-header">
             <h1 class="reception-header__title">Registro de cosecha</h1>
             <nav class="reception-header__nav">
-                <a href="/admin" class="reception-header__link">Administración</a>
+                <a href="/admin" class="reception-header__link">Administraci&oacute;n</a>
                 <a href="/history" class="reception-header__link">Historial</a>
                 <a href="/reports" class="reception-header__link">Reportes</a>
             </nav>
-            <p class="reception-header__subtitle">Escanee el código del trabajador</p>
+            <p class="reception-header__subtitle">Escanee el c&oacute;digo del trabajador</p>
         </header>
+
+        <section class="card product-selector" id="product-selector">
+            <h2 class="product-selector__title">Producto</h2>
+            <div id="product-buttons" class="product-selector__buttons">
+                <div class="status-message status-message--loading">
+                    <span class="spinner"></span>
+                    Cargando productos...
+                </div>
+            </div>
+            <div id="product-warning" class="status-message status-message--error" style="display:none;">
+                No hay productos activos. Contacte al administrador.
+            </div>
+        </section>
 
         <section class="card scanner-zone">
             <div class="scanner-zone__icon">
@@ -37,9 +50,9 @@
                     <line x1="7" y1="16" x2="17" y2="16" />
                 </svg>
             </div>
-            <label class="scanner-zone__label" for="barcode">Código del trabajador</label>
+            <label class="scanner-zone__label" for="barcode">C&oacute;digo del trabajador</label>
             <input class="scanner-zone__input" type="text" id="barcode"
-                placeholder="Escanee o escriba un código" autocomplete="off" autofocus>
+                placeholder="Escanee o escriba un c&oacute;digo" autocomplete="off" autofocus>
         </section>
 
         <div id="product-info" class="card">

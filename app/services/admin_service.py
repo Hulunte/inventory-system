@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from datetime import datetime, time, timedelta, timezone
 
 from flask import current_app
@@ -55,7 +57,7 @@ def get_harvest_entries_for_admin(operational_date, query_filter=None, tz=None):
     entries = []
     for entry, worker in rows:
         local_dt = entry.created_at.astimezone(tz)
-        entries.append({
+        entry_data = {
             "id": entry.id,
             "worker": {
                 "id": worker.id,
@@ -69,7 +71,12 @@ def get_harvest_entries_for_admin(operational_date, query_filter=None, tz=None):
             "voided_at": entry.voided_at.isoformat() if entry.voided_at else None,
             "voided_at_local": _format_voided_at_local(entry.voided_at, tz),
             "void_reason": entry.void_reason,
-        })
+            "product_id": entry.product_id,
+            "product_name": entry.product_name_snapshot,
+            "rate_per_kg": str(entry.rate_per_kg_snapshot.quantize(Decimal("0.01"))) if entry.rate_per_kg_snapshot is not None else None,
+            "amount_mxn": str(entry.amount_mxn.quantize(Decimal("0.01"))) if entry.amount_mxn is not None else None,
+        }
+        entries.append(entry_data)
 
     return entries
 

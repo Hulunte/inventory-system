@@ -1,10 +1,11 @@
 from datetime import datetime, time, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import func
 
 from app.extensions import db
 from app.models.harvest_entry import HarvestEntry
+from app.models.product import Product
 from app.models.worker import Worker
 
 
@@ -12,13 +13,27 @@ def get_worker_by_barcode(barcode):
     return Worker.query.filter_by(barcode=barcode, active=True).first()
 
 
-def register_harvest(barcode, weight_kg):
+def register_harvest(barcode, weight_kg, product_id):
     worker = get_worker_by_barcode(barcode)
 
     if worker is None:
         return None, None
 
-    entry = HarvestEntry(worker_id=worker.id, weight_kg=weight_kg)
+    product = db.session.get(Product, product_id)
+    if product is None or not product.active:
+        return None, None
+
+    rate_snapshot = Decimal(str(product.rate_per_kg))
+    amount = (weight_kg * rate_snapshot).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    entry = HarvestEntry(
+        worker_id=worker.id,
+        weight_kg=weight_kg,
+        product_id=product.id,
+        product_name_snapshot=product.name,
+        rate_per_kg_snapshot=rate_snapshot,
+        amount_mxn=amount,
+    )
 
     db.session.add(entry)
     db.session.commit()

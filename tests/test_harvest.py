@@ -128,13 +128,16 @@ class TestHarvestEndpoints:
         assert response.status_code == 404
 
     def test_register_harvest_endpoint(self, client, db_session):
+        from app.models.product import Product
         worker = Worker(barcode="W008", name="Sofia Martin")
         db_session.add(worker)
+        product = Product(name="TestProduct", rate_per_kg=Decimal("2.50"))
+        db_session.add(product)
         db_session.commit()
 
         response = client.post(
             "/api/harvest/entries",
-            json={"barcode": "W008", "weight_kg": 7.250},
+            json={"barcode": "W008", "weight_kg": 7.250, "product_id": product.id},
         )
         assert response.status_code == 201
         data = response.get_json()
@@ -160,17 +163,20 @@ class TestHarvestEndpoints:
         assert response_neg.status_code == 400
 
     def test_get_daily_total_endpoint(self, client, db_session):
+        from app.models.product import Product
         worker = Worker(barcode="W010", name="Elena Vargas")
         db_session.add(worker)
+        product = Product(name="TestProduct", rate_per_kg=Decimal("2.50"))
+        db_session.add(product)
         db_session.commit()
 
         client.post(
             "/api/harvest/entries",
-            json={"barcode": "W010", "weight_kg": 5.000},
+            json={"barcode": "W010", "weight_kg": 5.000, "product_id": product.id},
         )
         client.post(
             "/api/harvest/entries",
-            json={"barcode": "W010", "weight_kg": 3.500},
+            json={"barcode": "W010", "weight_kg": 3.500, "product_id": product.id},
         )
 
         response = client.get("/api/harvest/daily/W010")
