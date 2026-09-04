@@ -320,6 +320,26 @@ body {
     border-radius: 4px;
 }
 
+.worker-row__rate {
+    font-size: 0.85rem;
+    color: var(--clr-primary);
+    font-weight: 600;
+    background: var(--clr-primary-light);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+}
+
+.worker-row__actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.list-header--products {
+    margin-top: 1rem;
+}
+
 /* ---------- Badge ---------- */
 
 .badge {

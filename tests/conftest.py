@@ -72,15 +72,21 @@ _original_fss_get_bind = _fss_session.Session.get_bind
 def _patched_get_bind(self, mapper=None, clause=None, bind=None, **kwargs):
     """Respect explicit bind from configure(), needed for test isolation.
 
-    Flask-SQLAlchemy's get_bind() always resolves to the engine via
-    ``engines[None]``, ignoring any bind set via session.configure().
-    This patch checks the Session's bind attribute (set by
-    configure(bind=...)) before falling through to the engine fallback,
-    so test fixtures can bind db.session to a Connection with
-    join_transaction_mode="create_savepoint".
+    Flask-SQLAlchemy's get_bind() resolves to the engine via
+    ``engines[None]`` and also checks clause/mapper metadata, ignoring
+    any bind set via session.configure().  This patch checks the
+    Session's bind attribute (set by configure(bind=...)) FIRST so
+    that test fixtures can bind db.session to a Connection with
+    join_transaction_mode="create_savepoint" and all ORM + Core
+    operations (including ``session.execute(Table.delete())``) go
+    through that connection's transaction.
     """
     if bind is not None:
         return bind
+
+    session_bind = self.bind
+    if session_bind is not None:
+        return session_bind
 
     engines = self._db.engines
 
@@ -102,10 +108,6 @@ def _patched_get_bind(self, mapper=None, clause=None, bind=None, **kwargs):
 
         if engine is not None:
             return engine
-
-    session_bind = self.bind
-    if session_bind is not None:
-        return session_bind
 
     if None in engines:
         return engines[None]
@@ -138,9 +140,6 @@ def admin_client(app, db_session):
 
     app.config["ADMIN_PASSWORD_HASH"] = generate_password_hash("test-password-123")
 
-    connection = db_session.get_bind()
-    transaction = connection.begin_nested()
-
     client = app.test_client()
 
     session_response = client.get("/api/admin/session")
@@ -153,8 +152,6 @@ def admin_client(app, db_session):
     )
 
     yield client
-
-    transaction.rollback()
 
 
 @pytest.fixture(scope="function")
