@@ -669,13 +669,12 @@ def test_product_requires_csrf(admin_client, method, endpoint):
 
 class TestProductAdminPage:
     def test_section_form_and_modal_present(self, admin_client):
-        html = admin_client.get("/admin").data.decode()
-        assert 'id="products-section"' in html
+        html = admin_client.get("/admin/products").data.decode()
         assert 'id="product-form"' in html
         assert 'id="edit-product-modal"' in html
 
     def test_create_form_attributes(self, admin_client):
-        html = admin_client.get("/admin").data.decode()
+        html = admin_client.get("/admin/products").data.decode()
         assert 'id="product-name"' in html
         assert 'maxlength="100"' in html
         assert 'id="product-rate"' in html
@@ -685,7 +684,7 @@ class TestProductAdminPage:
         assert 'inputmode="decimal"' in html
 
     def test_edit_form_attributes(self, admin_client):
-        html = admin_client.get("/admin").data.decode()
+        html = admin_client.get("/admin/products").data.decode()
         assert 'id="edit-product-name"' in html
         assert 'maxlength="100"' in html
         assert 'id="edit-product-rate"' in html
@@ -695,7 +694,7 @@ class TestProductAdminPage:
         assert 'inputmode="decimal"' in html
 
     def test_label_and_no_inline_style(self, admin_client):
-        html = admin_client.get("/admin").data.decode()
+        html = admin_client.get("/admin/products").data.decode()
         assert "Precio por kg (MXN)" in html
         assert "Tarifa por kg (MXN)" not in html
         assert 'style="margin-top: 1rem;"' not in html

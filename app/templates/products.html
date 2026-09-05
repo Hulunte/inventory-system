@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ session.get('csrf_token', '') }}">
+
+    <title>Productos</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+
+<body>
+
+    <div class="admin-wrapper">
+
+        <header class="admin-header">
+            <h1 class="admin-header__title">Productos</h1>
+            <nav class="admin-header__nav">
+                <a href="/" class="admin-header__link">Recepci&oacute;n</a>
+                <a href="/admin" class="admin-header__link">Administraci&oacute;n</a>
+                <a href="/history" class="admin-header__link">Historial</a>
+                <a href="/reports" class="admin-header__link">Reportes</a>
+                <button id="logout-btn" class="btn btn--logout" type="button">Cerrar sesi&oacute;n</button>
+            </nav>
+        </header>
+
+        <section class="card">
+            <h2 class="card__title">Registrar producto</h2>
+
+            <form id="product-form" class="form" autocomplete="off">
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="product-name">Nombre</label>
+                        <input class="form__input" type="text" id="product-name"
+                            placeholder="Nombre del producto" autocomplete="off"
+                            required maxlength="100">
+                    </div>
+
+                    <div class="form__group">
+                        <label class="form__label" for="product-rate">Precio por kg (MXN)</label>
+                        <input class="form__input" type="number" id="product-rate"
+                            placeholder="0.00" step="0.01" min="0" max="999999.99"
+                            inputmode="decimal" autocomplete="off" required>
+                    </div>
+                </div>
+
+                <div id="product-message" class="form__message" hidden></div>
+
+                <button class="form__button" type="submit" id="product-submit">
+                    Registrar
+                </button>
+            </form>
+        </section>
+
+        <section class="card">
+            <div class="list-header">
+                <h2 class="card__title">Listado de productos</h2>
+
+                <div class="search-zone">
+                    <label class="search-zone__label" for="product-search-input">Buscar</label>
+                    <input class="search-zone__input" type="text" id="product-search-input"
+                        placeholder="Nombre del producto..." autocomplete="off">
+                </div>
+            </div>
+
+            <div id="product-list" class="worker-list">
+                <p class="worker-list__empty">Cargando productos...</p>
+            </div>
+        </section>
+
+    </div>
+
+    <div id="edit-product-modal" class="modal" hidden>
+        <div class="modal__content">
+            <h3 class="modal__title">Editar producto</h3>
+            <form id="edit-product-form" class="form" autocomplete="off">
+                <input type="hidden" id="edit-product-id">
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="edit-product-name">Nombre</label>
+                        <input class="form__input" type="text" id="edit-product-name" autocomplete="off"
+                            required maxlength="100">
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="edit-product-rate">Precio por kg (MXN)</label>
+                        <input class="form__input" type="number" id="edit-product-rate"
+                            step="0.01" min="0" max="999999.99" inputmode="decimal" autocomplete="off" required>
+                    </div>
+                </div>
+                <div id="edit-product-message" class="form__message" hidden></div>
+                <div class="modal__actions">
+                    <button class="btn btn--cancel" type="button" id="edit-product-cancel-btn">Cancelar</button>
+                    <button class="btn btn--primary" type="submit" id="edit-product-save-btn">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/products.js') }}"></script>
+</body>
+
+</html>
