@@ -225,6 +225,22 @@ body {
     margin-bottom: 0;
 }
 
+.slots-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.form__button--danger {
+    background: var(--clr-error);
+    color: #ffffff;
+}
+
+.form__button--danger:hover {
+    background: #b91c1c;
+}
+
 .search-zone {
     display: flex;
     align-items: center;
@@ -309,6 +325,21 @@ body {
     font-size: 0.95rem;
     color: var(--clr-text);
     white-space: nowrap;
+}
+
+.worker-row__slot {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--clr-primary);
+    background: var(--clr-primary-light);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.text-muted {
+    color: var(--clr-text-muted);
+    font-style: italic;
 }
 
 .worker-row__barcode {

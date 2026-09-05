@@ -2,19 +2,32 @@ import pytest
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from app.models.worker import Worker
 from app.models.harvest_entry import HarvestEntry
-from app.extensions import db
 from app.services.history_service import (
     get_daily_summary,
     get_worker_entries,
     parse_date,
 )
+from tests.conftest import make_worker, make_worker_with_assignment
 
 
 def _make_aware(dt_str, tz):
     naive = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
     return naive.replace(tzinfo=tz)
+
+
+def _make_entry(db_session, worker, assignment, weight_kg, created_at):
+    entry = HarvestEntry(
+        worker_id=worker.id,
+        weight_kg=weight_kg,
+        created_at=created_at,
+        worker_assignment_id=assignment.id,
+        worker_slot_number_snapshot=worker.slot_number,
+        worker_barcode_snapshot=worker.barcode,
+        worker_name_snapshot=assignment.person_name,
+    )
+    db_session.add(entry)
+    return entry
 
 
 class TestParseDate:
@@ -54,18 +67,12 @@ class TestDailySummary:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w1 = Worker(barcode="HS001-SUM", name="Ana Lopez Sum")
-            w2 = Worker(barcode="HS002-SUM", name="Bob Smith Sum")
-            db_session.add_all([w1, w2])
-            db_session.flush()
+            w1, a1 = make_worker_with_assignment(db_session, None, name="Ana Lopez Sum")
+            w2, a2 = make_worker_with_assignment(db_session, None, name="Bob Smith Sum")
 
-            e1 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("5.000"),
-                              created_at=utc_now + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("3.000"),
-                              created_at=utc_now + timedelta(hours=10))
-            e3 = HarvestEntry(worker_id=w2.id, weight_kg=Decimal("7.500"),
-                              created_at=utc_now + timedelta(hours=9))
-            db_session.add_all([e1, e2, e3])
+            _make_entry(db_session, w1, a1, Decimal("5.000"), utc_now + timedelta(hours=8))
+            _make_entry(db_session, w1, a1, Decimal("3.000"), utc_now + timedelta(hours=10))
+            _make_entry(db_session, w2, a2, Decimal("7.500"), utc_now + timedelta(hours=9))
             db_session.commit()
 
             result = get_daily_summary(today, query_filter="Sum", tz=tz)
@@ -103,18 +110,14 @@ class TestDailySummary:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="HS003-INACT", name="Inactive History X", active=False)
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, None, name="Inactive History X", active=False)
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("4.000"),
-                             created_at=utc_now + timedelta(hours=7))
-            db_session.add(e)
+            _make_entry(db_session, w, a, Decimal("4.000"), utc_now + timedelta(hours=7))
             db_session.commit()
 
             result = get_daily_summary(today, query_filter="Inactive History X", tz=tz)
             barcodes = [wk["barcode"] for wk in result["workers"]]
-            assert "HS003-INACT" in barcodes
+            assert w.barcode in barcodes
 
     def test_summary_search_filter_by_name(self, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
@@ -125,21 +128,16 @@ class TestDailySummary:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w1 = Worker(barcode="HS004-SRCH", name="Carlos Diaz Unique")
-            w2 = Worker(barcode="HS005-SRCH", name="Diana Ross Unique")
-            db_session.add_all([w1, w2])
-            db_session.flush()
+            w1, a1 = make_worker_with_assignment(db_session, None, name="Carlos Diaz Unique")
+            w2, a2 = make_worker_with_assignment(db_session, None, name="Diana Ross Unique")
 
-            e1 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("2.000"),
-                              created_at=utc_now + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w2.id, weight_kg=Decimal("3.000"),
-                              created_at=utc_now + timedelta(hours=9))
-            db_session.add_all([e1, e2])
+            _make_entry(db_session, w1, a1, Decimal("2.000"), utc_now + timedelta(hours=8))
+            _make_entry(db_session, w2, a2, Decimal("3.000"), utc_now + timedelta(hours=9))
             db_session.commit()
 
             result = get_daily_summary(today, query_filter="Carlos Diaz Unique", tz=tz)
             assert len(result["workers"]) == 1
-            assert result["workers"][0]["barcode"] == "HS004-SRCH"
+            assert result["workers"][0]["barcode"] == w1.barcode
 
     def test_summary_search_filter_by_barcode(self, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
@@ -150,21 +148,16 @@ class TestDailySummary:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w1 = Worker(barcode="XYZ100-BC", name="Eve Adams BC")
-            w2 = Worker(barcode="XYZ200-BC", name="Frank White BC")
-            db_session.add_all([w1, w2])
-            db_session.flush()
+            w1, a1 = make_worker_with_assignment(db_session, None, name="Eve Adams BC")
+            w2, a2 = make_worker_with_assignment(db_session, None, name="Frank White BC")
 
-            e1 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("1.000"),
-                              created_at=utc_now + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w2.id, weight_kg=Decimal("2.000"),
-                              created_at=utc_now + timedelta(hours=9))
-            db_session.add_all([e1, e2])
+            _make_entry(db_session, w1, a1, Decimal("1.000"), utc_now + timedelta(hours=8))
+            _make_entry(db_session, w2, a2, Decimal("2.000"), utc_now + timedelta(hours=9))
             db_session.commit()
 
-            result = get_daily_summary(today, query_filter="XYZ100-BC", tz=tz)
+            result = get_daily_summary(today, query_filter=w1.barcode, tz=tz)
             assert len(result["workers"]) == 1
-            assert result["workers"][0]["barcode"] == "XYZ100-BC"
+            assert result["workers"][0]["barcode"] == w1.barcode
 
     def test_summary_preserves_decimal_precision(self, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
@@ -175,13 +168,9 @@ class TestDailySummary:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="HS006-PRC", name="Precision Test Unique")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, None, name="Precision Test Unique")
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("1.234"),
-                             created_at=utc_now + timedelta(hours=8))
-            db_session.add(e)
+            _make_entry(db_session, w, a, Decimal("1.234"), utc_now + timedelta(hours=8))
             db_session.commit()
 
             result = get_daily_summary(today, query_filter="Precision Test Unique", tz=tz)
@@ -199,18 +188,13 @@ class TestWorkerEntries:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="HE001-DTL", name="Detail Worker Unique")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, None, name="Detail Worker Unique")
 
-            e1 = HarvestEntry(worker_id=w.id, weight_kg=Decimal("5.250"),
-                              created_at=utc_now + timedelta(hours=8, minutes=15))
-            e2 = HarvestEntry(worker_id=w.id, weight_kg=Decimal("6.000"),
-                              created_at=utc_now + timedelta(hours=10, minutes=30))
-            db_session.add_all([e1, e2])
+            _make_entry(db_session, w, a, Decimal("5.250"), utc_now + timedelta(hours=8, minutes=15))
+            _make_entry(db_session, w, a, Decimal("6.000"), utc_now + timedelta(hours=10, minutes=30))
             db_session.commit()
 
-            entries = get_worker_entries(w.id, today, tz)
+            entries = get_worker_entries(a.id, today, tz)
             assert len(entries) == 2
             assert entries[0].weight_kg == Decimal("5.250")
             assert entries[1].weight_kg == Decimal("6.000")
@@ -220,11 +204,9 @@ class TestWorkerEntries:
         with app.app_context():
             from datetime import date
 
-            w = Worker(barcode="HE002-EMP", name="No Entries Worker Unique")
-            db_session.add(w)
-            db_session.commit()
+            w, a = make_worker_with_assignment(db_session, None, name="No Entries Worker Unique")
 
-            entries = get_worker_entries(w.id, date(2099, 1, 1), tz)
+            entries = get_worker_entries(a.id, date(2099, 1, 1), tz)
             assert len(entries) == 0
 
     def test_worker_entries_inactive_worker(self, db_session, app):
@@ -236,16 +218,12 @@ class TestWorkerEntries:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="HE003-INA", name="Inactive Entries Unique", active=False)
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, None, name="Inactive Entries Unique", active=False)
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("3.000"),
-                             created_at=utc_now + timedelta(hours=7))
-            db_session.add(e)
+            _make_entry(db_session, w, a, Decimal("3.000"), utc_now + timedelta(hours=7))
             db_session.commit()
 
-            entries = get_worker_entries(w.id, today, tz)
+            entries = get_worker_entries(a.id, today, tz)
             assert len(entries) == 1
 
     def test_worker_entries_time_in_operational_timezone(self, db_session, app):
@@ -257,16 +235,12 @@ class TestWorkerEntries:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_8am = start.astimezone(timezone.utc) + timedelta(hours=8)
 
-            w = Worker(barcode="HE004-TZ", name="TZ Test Unique")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, None, name="TZ Test Unique")
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("1.000"),
-                             created_at=utc_8am)
-            db_session.add(e)
+            _make_entry(db_session, w, a, Decimal("1.000"), utc_8am)
             db_session.commit()
 
-            entries = get_worker_entries(w.id, today, tz)
+            entries = get_worker_entries(a.id, today, tz)
             assert len(entries) == 1
 
             local_time = entries[0].created_at.astimezone(tz)
@@ -283,13 +257,9 @@ class TestHistoryEndpoints:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="EP001-EP", name="Endpoint Worker Unique")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, None, name="Endpoint Worker Unique")
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("4.500"),
-                             created_at=utc_now + timedelta(hours=9))
-            db_session.add(e)
+            _make_entry(db_session, w, a, Decimal("4.500"), utc_now + timedelta(hours=9))
             db_session.commit()
 
             response = client.get(f"/api/history/daily?date={today.isoformat()}&q=Endpoint+Worker+Unique")
@@ -323,28 +293,24 @@ class TestHistoryEndpoints:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="EP002-EP", name="Entries Endpoint Unique")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, None, name="Entries Endpoint Unique")
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("2.500"),
-                             created_at=utc_now + timedelta(hours=10))
-            db_session.add(e)
+            _make_entry(db_session, w, a, Decimal("2.500"), utc_now + timedelta(hours=10))
             db_session.commit()
 
             response = client.get(
-                f"/api/history/workers/{w.id}/entries?date={today.isoformat()}"
+                f"/api/history/assignments/{a.id}/entries?date={today.isoformat()}"
             )
             assert response.status_code == 200
             data = response.get_json()
-            assert data["worker"]["id"] == w.id
+            assert data["worker"]["assignment_id"] == a.id
             assert len(data["entries"]) == 1
             assert data["entries"][0]["weight_kg"] == "2.500"
             assert data["summary"]["entries_count"] == 1
             assert data["summary"]["total_weight_kg"] == "2.500"
 
     def test_worker_entries_nonexistent_worker_endpoint(self, client, db_session):
-        response = client.get("/api/history/workers/99999/entries?date=2026-08-31")
+        response = client.get("/api/history/assignments/99999/entries?date=2026-08-31")
         assert response.status_code == 404
         data = response.get_json()
         assert "error" in data
@@ -354,12 +320,10 @@ class TestHistoryEndpoints:
         with app.app_context():
             from datetime import date
 
-            w = Worker(barcode="EP003-EP", name="No Entries Endpoint Unique")
-            db_session.add(w)
-            db_session.commit()
+            w, a = make_worker_with_assignment(db_session, None, name="No Entries Endpoint Unique")
 
             response = client.get(
-                f"/api/history/workers/{w.id}/entries?date=2099-01-01"
+                f"/api/history/assignments/{a.id}/entries?date=2099-01-01"
             )
             assert response.status_code == 200
             data = response.get_json()
@@ -370,12 +334,10 @@ class TestHistoryEndpoints:
     def test_worker_entries_invalid_date_endpoint(self, client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
-            w = Worker(barcode="EP004-EP", name="Invalid Date Endpoint Unique")
-            db_session.add(w)
-            db_session.commit()
+            w, a = make_worker_with_assignment(db_session, None, name="Invalid Date Endpoint Unique")
 
             response = client.get(
-                f"/api/history/workers/{w.id}/entries?date=not-a-date"
+                f"/api/history/assignments/{a.id}/entries?date=not-a-date"
             )
             assert response.status_code == 400
 
@@ -388,17 +350,13 @@ class TestHistoryEndpoints:
             start = datetime.combine(today, dt_time.min, tzinfo=tz)
             utc_14 = start.astimezone(timezone.utc) + timedelta(hours=14)
 
-            w = Worker(barcode="EP005-EP", name="TZ Endpoint Unique")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, None, name="TZ Endpoint Unique")
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("1.000"),
-                             created_at=utc_14)
-            db_session.add(e)
+            _make_entry(db_session, w, a, Decimal("1.000"), utc_14)
             db_session.commit()
 
             response = client.get(
-                f"/api/history/workers/{w.id}/entries?date={today.isoformat()}"
+                f"/api/history/assignments/{a.id}/entries?date={today.isoformat()}"
             )
             data = response.get_json()
             assert data["entries"][0]["created_at"] == "14:00"

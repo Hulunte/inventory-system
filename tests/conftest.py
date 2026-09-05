@@ -59,6 +59,8 @@ _validate_database_safety()
 
 from app import create_app
 from app.extensions import db as _db
+from app.models.worker import Worker
+from app.models.worker_assignment import WorkerAssignment
 from config import TestConfig
 
 import flask_sqlalchemy.session as _fss_session
@@ -171,3 +173,41 @@ def db_session(app):
         _db.session.close()
         transaction.rollback()
         connection.close()
+
+
+_slot_counter = 0
+
+
+def _next_slot():
+    global _slot_counter
+    _slot_counter += 1
+    return (_slot_counter % 150) + 1
+
+
+def make_worker(db_session, barcode=None, name=None, active=True, slot_number=None):
+    if slot_number is None:
+        slot_number = _next_slot()
+    if barcode is None:
+        barcode = f"TRB{slot_number:06d}"
+    worker = Worker(barcode=barcode, name=name, slot_number=slot_number, active=active)
+    db_session.add(worker)
+    db_session.flush()
+    return worker
+
+
+def make_assignment(db_session, worker, person_name=None):
+    if person_name is None:
+        person_name = worker.name or f"Person {worker.slot_number}"
+    assignment = WorkerAssignment(
+        worker_id=worker.id,
+        person_name=person_name,
+    )
+    db_session.add(assignment)
+    db_session.flush()
+    return assignment
+
+
+def make_worker_with_assignment(db_session, barcode=None, name=None, active=True, slot_number=None, person_name=None):
+    worker = make_worker(db_session, barcode, name=name, active=active, slot_number=slot_number)
+    assignment = make_assignment(db_session, worker, person_name=person_name or name)
+    return worker, assignment

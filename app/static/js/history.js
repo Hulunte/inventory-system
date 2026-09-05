@@ -79,6 +79,7 @@ async function loadSummary() {
             <table class="summary-table">
                 <thead>
                     <tr>
+                        <th>Cupo</th>
                         <th>Trabajador</th>
                         <th>Código</th>
                         <th class="num">Tandas</th>
@@ -89,8 +90,9 @@ async function loadSummary() {
                     ${data.workers.map(w => `
                         <tr class="summary-row ${w.worker_id === selectedWorkerId ? "summary-row--selected" : ""}"
                             data-worker-id="${w.worker_id}">
-                            <td>${escapeHtml(w.name)}</td>
-                            <td class="mono">${escapeHtml(w.barcode)}</td>
+                            <td>${w.slot_label ? escapeHtml(w.slot_label) : "—"}</td>
+                            <td>${w.name ? escapeHtml(w.name) : "Sin asignar"}</td>
+                            <td class="mono">${w.barcode ? escapeHtml(w.barcode) : "—"}</td>
                             <td class="num">${w.entries_count}</td>
                             <td class="num bold">${w.total_weight_kg}</td>
                         </tr>
@@ -98,7 +100,7 @@ async function loadSummary() {
                 </tbody>
                 <tfoot>
                     <tr class="summary-total">
-                        <td colspan="2">TOTAL</td>
+                        <td colspan="3">TOTAL</td>
                         <td class="num">${data.summary.total_entries}</td>
                         <td class="num bold">${data.summary.total_weight_kg}</td>
                     </tr>
@@ -132,7 +134,7 @@ async function selectWorker(workerId, date) {
 
     try {
         const response = await fetch(
-            `/api/history/workers/${workerId}/entries?date=${encodeURIComponent(date)}`
+            `/api/history/assignments/${workerId}/entries?date=${encodeURIComponent(date)}`
         );
 
         if (!response.ok) {
@@ -148,7 +150,10 @@ async function selectWorker(workerId, date) {
             month: "long",
             year: "numeric",
         });
-        detailTitle.textContent = `Detalle: ${data.worker.name} - ${dateFormatted}`;
+        const workerDisplay = data.worker.slot_label
+            ? `${data.worker.slot_label} - ${data.worker.name || "Sin asignar"}`
+            : (data.worker.name || "Sin asignar");
+        detailTitle.textContent = `Detalle: ${workerDisplay} - ${dateFormatted}`;
 
         if (data.entries.length === 0) {
             detailContent.innerHTML = `

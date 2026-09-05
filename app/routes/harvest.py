@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from app.exceptions import ProductUnavailableError
 from app.services.harvest_service import (
+    WorkerUnassignedError,
     get_all_entries,
     get_daily_total,
     get_worker_by_barcode,
@@ -80,6 +81,11 @@ def create_entry():
             "error": "El producto seleccionado ya no está disponible.",
             "code": "product_unavailable",
         }), 409
+    except WorkerUnassignedError:
+        return jsonify({
+            "error": "Este cupo no tiene una persona asignada.",
+            "code": "worker_unassigned",
+        }), 409
 
     if entry is None:
         return jsonify({"error": "Trabajador no encontrado"}), 404
@@ -93,8 +99,10 @@ def create_entry():
                 "weight_kg": str(entry.weight_kg),
                 "worker": {
                     "id": worker.id,
-                    "barcode": worker.barcode,
-                    "name": worker.name,
+                    "barcode": entry.worker_barcode_snapshot or worker.barcode,
+                    "name": entry.worker_name_snapshot or worker.name,
+                    "slot_number": entry.worker_slot_number_snapshot or worker.slot_number,
+                    "slot_label": f"Trabajador {(entry.worker_slot_number_snapshot or worker.slot_number):03d}",
                 },
                 "product_id": entry.product_id,
                 "product_name": entry.product_name_snapshot,
@@ -115,7 +123,18 @@ def get_daily(barcode):
     if worker is None:
         return jsonify({"error": "Worker not found"}), 404
 
-    daily_total = get_daily_total(worker.id)
+    from app.models.worker_assignment import WorkerAssignment
+    open_assignment = WorkerAssignment.query.filter_by(
+        worker_id=worker.id, ended_at=None
+    ).first()
+
+    if open_assignment is None:
+        return jsonify({
+            "error": "Este cupo no tiene una persona asignada.",
+            "code": "worker_unassigned",
+        }), 409
+
+    daily_total = get_daily_total(open_assignment.id)
 
     return jsonify(
         {
@@ -123,6 +142,8 @@ def get_daily(barcode):
                 "id": worker.id,
                 "barcode": worker.barcode,
                 "name": worker.name,
+                "slot_number": worker.slot_number,
+                "slot_label": worker.slot_label,
             },
             "daily_total": str(daily_total),
         }
@@ -140,8 +161,10 @@ def list_entries():
                 "weight_kg": str(entry.weight_kg),
                 "worker": {
                     "id": entry.worker.id,
-                    "barcode": entry.worker.barcode,
-                    "name": entry.worker.name,
+                    "barcode": entry.worker_barcode_snapshot or entry.worker.barcode,
+                    "name": entry.worker_name_snapshot or entry.worker.name,
+                    "slot_number": entry.worker_slot_number_snapshot or entry.worker.slot_number,
+                    "slot_label": f"Trabajador {(entry.worker_slot_number_snapshot or entry.worker.slot_number):03d}",
                 },
                 "product_id": entry.product_id,
                 "product_name": entry.product_name_snapshot,

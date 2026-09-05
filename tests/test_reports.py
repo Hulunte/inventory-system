@@ -2,10 +2,10 @@ import pytest
 from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal
 
-from app.models.worker import Worker
 from app.models.harvest_entry import HarvestEntry
 from app.extensions import db
 from app.services.report_service import get_harvest_report, parse_date
+from tests.conftest import make_worker, make_worker_with_assignment
 
 
 class TestParseDate:
@@ -43,17 +43,33 @@ class TestHarvestReport:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w1 = Worker(barcode="RPT001-RPT", name="Ana Rpt Unique")
-            w2 = Worker(barcode="RPT002-RPT", name="Bob Rpt Unique")
-            db_session.add_all([w1, w2])
-            db_session.flush()
+            w1, a1 = make_worker_with_assignment(db_session, name="Ana Rpt Unique")
+            w2, a2 = make_worker_with_assignment(db_session, name="Bob Rpt Unique")
 
-            e1 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("5.000"),
-                              created_at=utc_now + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("3.000"),
-                              created_at=utc_now + timedelta(hours=10))
-            e3 = HarvestEntry(worker_id=w2.id, weight_kg=Decimal("7.500"),
-                              created_at=utc_now + timedelta(hours=9))
+            e1 = HarvestEntry(
+                worker_id=w1.id, worker_assignment_id=a1.id,
+                worker_slot_number_snapshot=w1.slot_number,
+                worker_barcode_snapshot=w1.barcode,
+                worker_name_snapshot=a1.person_name,
+                weight_kg=Decimal("5.000"),
+                created_at=utc_now + timedelta(hours=8),
+            )
+            e2 = HarvestEntry(
+                worker_id=w1.id, worker_assignment_id=a1.id,
+                worker_slot_number_snapshot=w1.slot_number,
+                worker_barcode_snapshot=w1.barcode,
+                worker_name_snapshot=a1.person_name,
+                weight_kg=Decimal("3.000"),
+                created_at=utc_now + timedelta(hours=10),
+            )
+            e3 = HarvestEntry(
+                worker_id=w2.id, worker_assignment_id=a2.id,
+                worker_slot_number_snapshot=w2.slot_number,
+                worker_barcode_snapshot=w2.barcode,
+                worker_name_snapshot=a2.person_name,
+                weight_kg=Decimal("7.500"),
+                created_at=utc_now + timedelta(hours=9),
+            )
             db_session.add_all([e1, e2, e3])
             db_session.commit()
 
@@ -90,18 +106,22 @@ class TestHarvestReport:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="RPT003-INA", name="Inactive Rpt Unique", active=False)
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, name="Inactive Rpt Unique", active=False)
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("4.000"),
-                             created_at=utc_now + timedelta(hours=7))
+            e = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("4.000"),
+                created_at=utc_now + timedelta(hours=7),
+            )
             db_session.add(e)
             db_session.commit()
 
             result = get_harvest_report(today, today, query_filter="Inactive Rpt Unique", tz=tz)
             barcodes = [wk["barcode"] for wk in result["workers"]]
-            assert "RPT003-INA" in barcodes
+            assert w.barcode in barcodes
 
     def test_report_filter_by_name(self, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
@@ -110,21 +130,31 @@ class TestHarvestReport:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w1 = Worker(barcode="RPT004-NM", name="Carlos Rpt Name")
-            w2 = Worker(barcode="RPT005-NM", name="Diana Rpt Name")
-            db_session.add_all([w1, w2])
-            db_session.flush()
+            w1, a1 = make_worker_with_assignment(db_session, name="Carlos Rpt Name")
+            w2, a2 = make_worker_with_assignment(db_session, name="Diana Rpt Name")
 
-            e1 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("2.000"),
-                              created_at=utc_now + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w2.id, weight_kg=Decimal("3.000"),
-                              created_at=utc_now + timedelta(hours=9))
+            e1 = HarvestEntry(
+                worker_id=w1.id, worker_assignment_id=a1.id,
+                worker_slot_number_snapshot=w1.slot_number,
+                worker_barcode_snapshot=w1.barcode,
+                worker_name_snapshot=a1.person_name,
+                weight_kg=Decimal("2.000"),
+                created_at=utc_now + timedelta(hours=8),
+            )
+            e2 = HarvestEntry(
+                worker_id=w2.id, worker_assignment_id=a2.id,
+                worker_slot_number_snapshot=w2.slot_number,
+                worker_barcode_snapshot=w2.barcode,
+                worker_name_snapshot=a2.person_name,
+                weight_kg=Decimal("3.000"),
+                created_at=utc_now + timedelta(hours=9),
+            )
             db_session.add_all([e1, e2])
             db_session.commit()
 
             result = get_harvest_report(today, today, query_filter="Carlos Rpt Name", tz=tz)
             assert len(result["workers"]) == 1
-            assert result["workers"][0]["barcode"] == "RPT004-NM"
+            assert result["workers"][0]["barcode"] == w1.barcode
 
     def test_report_filter_by_barcode(self, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
@@ -133,21 +163,31 @@ class TestHarvestReport:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w1 = Worker(barcode="XYZ800-BC", name="Eve Rpt Barcode")
-            w2 = Worker(barcode="XYZ801-BC", name="Frank Rpt Barcode")
-            db_session.add_all([w1, w2])
-            db_session.flush()
+            w1, a1 = make_worker_with_assignment(db_session, name="Eve Rpt Barcode")
+            w2, a2 = make_worker_with_assignment(db_session, name="Frank Rpt Barcode")
 
-            e1 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("1.000"),
-                              created_at=utc_now + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w2.id, weight_kg=Decimal("2.000"),
-                              created_at=utc_now + timedelta(hours=9))
+            e1 = HarvestEntry(
+                worker_id=w1.id, worker_assignment_id=a1.id,
+                worker_slot_number_snapshot=w1.slot_number,
+                worker_barcode_snapshot=w1.barcode,
+                worker_name_snapshot=a1.person_name,
+                weight_kg=Decimal("1.000"),
+                created_at=utc_now + timedelta(hours=8),
+            )
+            e2 = HarvestEntry(
+                worker_id=w2.id, worker_assignment_id=a2.id,
+                worker_slot_number_snapshot=w2.slot_number,
+                worker_barcode_snapshot=w2.barcode,
+                worker_name_snapshot=a2.person_name,
+                weight_kg=Decimal("2.000"),
+                created_at=utc_now + timedelta(hours=9),
+            )
             db_session.add_all([e1, e2])
             db_session.commit()
 
-            result = get_harvest_report(today, today, query_filter="XYZ800-BC", tz=tz)
+            result = get_harvest_report(today, today, query_filter=w1.barcode, tz=tz)
             assert len(result["workers"]) == 1
-            assert result["workers"][0]["barcode"] == "XYZ800-BC"
+            assert result["workers"][0]["barcode"] == w1.barcode
 
     def test_report_preserves_decimal_precision(self, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
@@ -156,12 +196,16 @@ class TestHarvestReport:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="RPT006-PRC", name="Precision Rpt Unique")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, name="Precision Rpt Unique")
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("1.234"),
-                             created_at=utc_now + timedelta(hours=8))
+            e = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("1.234"),
+                created_at=utc_now + timedelta(hours=8),
+            )
             db_session.add(e)
             db_session.commit()
 
@@ -176,18 +220,40 @@ class TestHarvestReport:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="RPT007-FMT", name="Format Rpt Unique")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, name="Format Rpt Unique")
 
-            e1 = HarvestEntry(worker_id=w.id, weight_kg=Decimal("5"),
-                              created_at=utc_now + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w.id, weight_kg=Decimal("5.2"),
-                              created_at=utc_now + timedelta(hours=9))
-            e3 = HarvestEntry(worker_id=w.id, weight_kg=Decimal("5.25"),
-                              created_at=utc_now + timedelta(hours=10))
-            e4 = HarvestEntry(worker_id=w.id, weight_kg=Decimal("5.250"),
-                              created_at=utc_now + timedelta(hours=11))
+            e1 = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("5"),
+                created_at=utc_now + timedelta(hours=8),
+            )
+            e2 = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("5.2"),
+                created_at=utc_now + timedelta(hours=9),
+            )
+            e3 = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("5.25"),
+                created_at=utc_now + timedelta(hours=10),
+            )
+            e4 = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("5.250"),
+                created_at=utc_now + timedelta(hours=11),
+            )
             db_session.add_all([e1, e2, e3, e4])
             db_session.commit()
 
@@ -204,12 +270,16 @@ class TestHarvestReport:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="RPT008-SD", name="Single Day Rpt")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, name="Single Day Rpt")
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("6.000"),
-                             created_at=utc_now + timedelta(hours=8))
+            e = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("6.000"),
+                created_at=utc_now + timedelta(hours=8),
+            )
             db_session.add(e)
             db_session.commit()
 
@@ -228,14 +298,24 @@ class TestHarvestReport:
             start_today = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_today = start_today.astimezone(timezone.utc)
 
-            w = Worker(barcode="RPT009-MD", name="Multi Day Rpt")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, name="Multi Day Rpt")
 
-            e1 = HarvestEntry(worker_id=w.id, weight_kg=Decimal("3.000"),
-                              created_at=utc_yesterday + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w.id, weight_kg=Decimal("4.000"),
-                              created_at=utc_today + timedelta(hours=9))
+            e1 = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("3.000"),
+                created_at=utc_yesterday + timedelta(hours=8),
+            )
+            e2 = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("4.000"),
+                created_at=utc_today + timedelta(hours=9),
+            )
             db_session.add_all([e1, e2])
             db_session.commit()
 
@@ -255,12 +335,16 @@ class TestReportEndpoints:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w = Worker(barcode="EPT001-RPT", name="Endpoint Rpt")
-            db_session.add(w)
-            db_session.flush()
+            w, a = make_worker_with_assignment(db_session, name="Endpoint Rpt")
 
-            e = HarvestEntry(worker_id=w.id, weight_kg=Decimal("4.500"),
-                             created_at=utc_now + timedelta(hours=9))
+            e = HarvestEntry(
+                worker_id=w.id, worker_assignment_id=a.id,
+                worker_slot_number_snapshot=w.slot_number,
+                worker_barcode_snapshot=w.barcode,
+                worker_name_snapshot=a.person_name,
+                weight_kg=Decimal("4.500"),
+                created_at=utc_now + timedelta(hours=9),
+            )
             db_session.add(e)
             db_session.commit()
 
@@ -336,15 +420,25 @@ class TestReportEndpoints:
             start = datetime.combine(today, datetime.min.time(), tzinfo=tz)
             utc_now = start.astimezone(timezone.utc)
 
-            w1 = Worker(barcode="EPT002-QF", name="Filter Rpt Me")
-            w2 = Worker(barcode="EPT003-QF", name="Skip Rpt Me")
-            db_session.add_all([w1, w2])
-            db_session.flush()
+            w1, a1 = make_worker_with_assignment(db_session, name="Filter Rpt Me")
+            w2, a2 = make_worker_with_assignment(db_session, name="Skip Rpt Me")
 
-            e1 = HarvestEntry(worker_id=w1.id, weight_kg=Decimal("2.500"),
-                              created_at=utc_now + timedelta(hours=8))
-            e2 = HarvestEntry(worker_id=w2.id, weight_kg=Decimal("3.000"),
-                              created_at=utc_now + timedelta(hours=9))
+            e1 = HarvestEntry(
+                worker_id=w1.id, worker_assignment_id=a1.id,
+                worker_slot_number_snapshot=w1.slot_number,
+                worker_barcode_snapshot=w1.barcode,
+                worker_name_snapshot=a1.person_name,
+                weight_kg=Decimal("2.500"),
+                created_at=utc_now + timedelta(hours=8),
+            )
+            e2 = HarvestEntry(
+                worker_id=w2.id, worker_assignment_id=a2.id,
+                worker_slot_number_snapshot=w2.slot_number,
+                worker_barcode_snapshot=w2.barcode,
+                worker_name_snapshot=a2.person_name,
+                weight_kg=Decimal("3.000"),
+                created_at=utc_now + timedelta(hours=9),
+            )
             db_session.add_all([e1, e2])
             db_session.commit()
 
