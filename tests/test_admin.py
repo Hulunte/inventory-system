@@ -343,3 +343,80 @@ class TestAdminPageOperationalToday:
         html = response.data.decode()
         assert 'ADMIN_CONFIG' in html
         assert 'operationalToday: "2026-06-17"' in html
+
+
+class TestProductsPage:
+    def test_products_page_redirects_without_session(self, client):
+        response = client.get("/admin/products", follow_redirects=False)
+        assert response.status_code == 302
+        assert "/admin/login" in response.headers["Location"]
+
+    def test_products_page_200_for_admin(self, admin_client):
+        response = admin_client.get("/admin/products")
+        assert response.status_code == 200
+
+    def test_products_page_contains_form(self, admin_client):
+        response = admin_client.get("/admin/products")
+        html = response.data.decode()
+        assert 'id="product-form"' in html
+        assert 'id="product-name"' in html
+        assert 'id="product-rate"' in html
+        assert 'id="product-submit"' in html
+
+    def test_products_page_contains_search(self, admin_client):
+        response = admin_client.get("/admin/products")
+        html = response.data.decode()
+        assert 'id="product-search-input"' in html
+
+    def test_products_page_contains_list(self, admin_client):
+        response = admin_client.get("/admin/products")
+        html = response.data.decode()
+        assert 'id="product-list"' in html
+
+    def test_products_page_contains_modal(self, admin_client):
+        response = admin_client.get("/admin/products")
+        html = response.data.decode()
+        assert 'id="edit-product-modal"' in html
+        assert 'id="edit-product-form"' in html
+
+    def test_products_page_loads_products_js(self, admin_client):
+        response = admin_client.get("/admin/products")
+        html = response.data.decode()
+        assert 'products.js' in html
+
+    def test_products_page_has_nav_link_to_admin(self, admin_client):
+        response = admin_client.get("/admin/products")
+        html = response.data.decode()
+        assert '/admin' in html
+
+    def test_products_page_no_product_section_in_admin(self, admin_client):
+        response = admin_client.get("/admin")
+        html = response.data.decode()
+        assert 'id="products-section"' not in html
+        assert 'id="product-form"' not in html
+        assert 'id="edit-product-modal"' not in html
+
+    def test_admin_page_has_products_nav_link(self, admin_client):
+        response = admin_client.get("/admin")
+        html = response.data.decode()
+        assert '/admin/products' in html
+        assert 'Productos' in html
+
+
+class TestAdminJsNoProductRefs:
+    def test_admin_js_has_no_product_refs(self):
+        import os
+        js_path = os.path.join(os.path.dirname(__file__), "..", "app", "static", "js", "admin.js")
+        with open(js_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "product-form" not in content
+        assert "product-name" not in content
+        assert "product-rate" not in content
+        assert "product-submit" not in content
+        assert "product-search-input" not in content
+        assert "product-list" not in content
+        assert "edit-product-modal" not in content
+        assert "edit-product-form" not in content
+        assert "loadProducts" not in content
+        assert "renderProduct" not in content
+        assert "productsById" not in content

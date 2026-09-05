@@ -32,6 +32,13 @@ def admin_page():
     return render_template("admin.html", operational_today=_operational_today().isoformat())
 
 
+@views_bp.get("/admin/products")
+def products_page():
+    if not session.get("admin"):
+        return redirect(url_for("views.admin_login_page"))
+    return render_template("products.html")
+
+
 @views_bp.get("/history")
 def history_page():
     return render_template("history.html", operational_today=_operational_today().isoformat())
