@@ -52,6 +52,7 @@ def reports_page():
     return render_template(
         "reports.html",
         is_admin=bool(session.get("admin")),
+        csrf_token=session.get("csrf_token", ""),
         operational_today=today.isoformat(),
         current_week_start=monday_current.isoformat(),
         current_week_end=sunday_current.isoformat(),

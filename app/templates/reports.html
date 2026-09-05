@@ -7,6 +7,10 @@
 
     <title>Reportes de cosecha</title>
 
+    {% if is_admin %}
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    {% endif %}
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reports.css') }}">
 </head>
 
@@ -66,6 +70,22 @@
                 </div>
                 {% endif %}
             </div>
+
+            {% if is_admin %}
+            <div class="filters__row filters__row--email" id="email-section" hidden>
+                <div class="filters__group filters__group--wide">
+                    <label class="filters__label" for="email-input">Correo electrónico</label>
+                    <input class="filters__input" type="email" id="email-input"
+                        placeholder="correo@ejemplo.com" autocomplete="off">
+                </div>
+                <div class="filters__group filters__group--send">
+                    <button class="filters__button filters__button--send" type="button" id="send-email-btn">
+                        Enviar por correo
+                    </button>
+                </div>
+                <div id="email-message" class="filters__email-message" hidden></div>
+            </div>
+            {% endif %}
 
             <div id="range-warning" class="filters__warning" hidden>
                 El rango seleccionado supera los 365 días. La consulta puede tardar más de lo habitual.

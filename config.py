@@ -24,6 +24,15 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(hours=4)
     SESSION_REFRESH_EACH_REQUEST = False
 
+    MAIL_SMTP_HOST = os.getenv("MAIL_SMTP_HOST", "smtp.gmail.com")
+    MAIL_SMTP_PORT = int(os.getenv("MAIL_SMTP_PORT", "587"))
+    MAIL_SMTP_USERNAME = os.getenv("MAIL_SMTP_USERNAME")
+    MAIL_SMTP_APP_PASSWORD = os.getenv("MAIL_SMTP_APP_PASSWORD")
+    MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Sistema de Cosecha")
+    MAIL_FROM_ADDRESS = os.getenv("MAIL_FROM_ADDRESS")
+    MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "true")
+    MAIL_TIMEOUT_SECONDS = int(os.getenv("MAIL_TIMEOUT_SECONDS", "30"))
+
 
 class TestConfig(Config):
     TESTING = True

@@ -220,3 +220,97 @@ if (exportBtn) {
         window.location.href = url;
     });
 }
+
+
+// --- Email export ---
+
+const emailSection = document.getElementById("email-section");
+const emailInput = document.getElementById("email-input");
+const sendEmailBtn = document.getElementById("send-email-btn");
+const emailMessage = document.getElementById("email-message");
+
+if (emailSection) {
+    emailSection.hidden = false;
+}
+
+function showEmailMessage(text, isError) {
+    if (!emailMessage) return;
+    emailMessage.hidden = false;
+    emailMessage.textContent = text;
+    emailMessage.className = isError
+        ? "filters__email-message filters__email-message--error"
+        : "filters__email-message filters__email-message--success";
+}
+
+function hideEmailMessage() {
+    if (!emailMessage) return;
+    emailMessage.hidden = true;
+    emailMessage.textContent = "";
+}
+
+if (sendEmailBtn) {
+    sendEmailBtn.addEventListener("click", async () => {
+        const start = startDateInput.value;
+        const end = endDateInput.value;
+
+        if (!start || !end) {
+            showEmailMessage("Selecciona un rango de fechas antes de enviar.", true);
+            return;
+        }
+
+        const email = (emailInput.value || "").trim();
+        if (!email) {
+            showEmailMessage("Ingresa un correo electrónico válido.", true);
+            emailInput.focus();
+            return;
+        }
+
+        const q = searchInput.value.trim();
+
+        sendEmailBtn.disabled = true;
+        sendEmailBtn.textContent = "Enviando...";
+        hideEmailMessage();
+
+        try {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.content : "";
+
+            const response = await fetch("/api/reports/harvest/export/email", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken,
+                },
+                body: JSON.stringify({
+                    email: email,
+                    start_date: start,
+                    end_date: end,
+                    q: q || undefined,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                showEmailMessage(result.error || "No fue posible enviar el correo.", true);
+                return;
+            }
+
+            showEmailMessage(result.message || "Correo enviado exitosamente.", false);
+            emailInput.value = "";
+
+        } catch (error) {
+            showEmailMessage("No fue posible enviar el correo. Intente nuevamente.", true);
+        } finally {
+            sendEmailBtn.disabled = false;
+            sendEmailBtn.textContent = "Enviar por correo";
+        }
+    });
+
+    emailInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            sendEmailBtn.click();
+        }
+    });
+}

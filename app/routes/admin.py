@@ -194,8 +194,7 @@ def deactivate_worker_slot(worker_id):
 @admin_bp.get("/api/admin/worker-slots/export")
 @require_admin
 def export_worker_slots():
-    xlsx_bytes = generate_credentials_export()
-    filename = "credenciales_trabajadores.xlsx"
+    xlsx_bytes, filename = generate_credentials_export()
 
     return Response(
         xlsx_bytes,
