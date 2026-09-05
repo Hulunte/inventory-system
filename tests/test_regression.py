@@ -167,7 +167,7 @@ class TestExcelSeparatesAssignments:
 
         _make_entry(db_session, w, a2, Decimal("3.000"), utc_start + timedelta(hours=12), product)
 
-        xlsx_bytes = generate_harvest_export(today, today, tz=tz)
+        xlsx_bytes, _ = generate_harvest_export(today, today, tz=tz)
         wb = load_workbook(io.BytesIO(xlsx_bytes))
         ws = wb["Resumen"]
 
@@ -192,7 +192,7 @@ class TestExcelSeparatesAssignments:
         w, a = make_worker_with_assignment(db_session, name="SnapTest")
         _make_entry(db_session, w, a, Decimal("7.000"), utc_start + timedelta(hours=9), product)
 
-        xlsx_bytes = generate_harvest_export(today, today, tz=tz)
+        xlsx_bytes, _ = generate_harvest_export(today, today, tz=tz)
         wb = load_workbook(io.BytesIO(xlsx_bytes))
         ws = wb["Movimientos"]
 

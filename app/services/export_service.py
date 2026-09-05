@@ -224,7 +224,10 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return buf.getvalue()
+    xlsx_bytes = buf.getvalue()
+
+    filename = f"inventario_{start_date.isoformat()}_a_{end_date.isoformat()}.xlsx"
+    return xlsx_bytes, filename
 
 
 def generate_credentials_export():
@@ -259,4 +262,7 @@ def generate_credentials_export():
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return buf.getvalue()
+    xlsx_bytes = buf.getvalue()
+
+    filename = "credenciales_trabajadores.xlsx"
+    return xlsx_bytes, filename
