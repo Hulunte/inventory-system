@@ -1,11 +1,16 @@
-const createForm = document.getElementById("create-form");
-const createName = document.getElementById("create-name");
-const createBarcode = document.getElementById("create-barcode");
-const createMessage = document.getElementById("create-message");
-const createSubmit = document.getElementById("create-submit");
-const searchInput = document.getElementById("search-input");
-const workerList = document.getElementById("worker-list");
 const logoutBtn = document.getElementById("logout-btn");
+const slotSearchInput = document.getElementById("slot-search-input");
+const slotList = document.getElementById("slot-list");
+const cleanSlotsBtn = document.getElementById("clean-slots-btn");
+const assignModal = document.getElementById("assign-modal");
+const assignModalText = document.getElementById("assign-modal-text");
+const assignForm = document.getElementById("assign-form");
+const assignWorkerId = document.getElementById("assign-worker-id");
+const assignPersonName = document.getElementById("assign-person-name");
+const assignMessage = document.getElementById("assign-message");
+const assignCancelBtn = document.getElementById("assign-cancel-btn");
+const assignSaveBtn = document.getElementById("assign-save-btn");
+
 const entryDateInput = document.getElementById("entry-date-input");
 const entrySearchInput = document.getElementById("entry-search-input");
 const entriesList = document.getElementById("entries-list");
@@ -32,7 +37,7 @@ const editProductCancelBtn = document.getElementById("edit-product-cancel-btn");
 const editProductSaveBtn = document.getElementById("edit-product-save-btn");
 
 let csrfToken = "";
-let searchTimeout = null;
+let slotSearchTimeout = null;
 let entrySearchTimeout = null;
 let productSearchTimeout = null;
 let currentVoidEntryId = null;
@@ -91,61 +96,19 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 
-createForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const name = createName.value.trim();
-    const barcode = createBarcode.value.trim();
-
-    if (!name || !barcode) {
-        showMessage(createMessage, "Nombre y código son requeridos.", "error");
-        return;
-    }
-
-    createSubmit.disabled = true;
-    createSubmit.textContent = "Registrando...";
-
-    try {
-        const response = await fetch("/api/admin/workers", {
-            method: "POST",
-            headers: apiHeaders(),
-            body: JSON.stringify({ name, barcode }),
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.error || "No fue posible registrar el trabajador");
-        }
-
-        showMessage(createMessage, `Trabajador "${result.name}" registrado correctamente.`, "success");
-        createName.value = "";
-        createBarcode.value = "";
-        createName.focus();
-        loadWorkers();
-
-    } catch (error) {
-        showMessage(createMessage, error.message, "error");
-    } finally {
-        createSubmit.disabled = false;
-        createSubmit.textContent = "Registrar";
-    }
-});
-
-
-searchInput.addEventListener("input", () => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        loadWorkers(searchInput.value.trim());
+slotSearchInput.addEventListener("input", () => {
+    clearTimeout(slotSearchTimeout);
+    slotSearchTimeout = setTimeout(() => {
+        loadWorkerSlots(slotSearchInput.value.trim());
     }, 250);
 });
 
 
-async function loadWorkers(query) {
-    workerList.innerHTML = `<p class="worker-list__empty">Cargando...</p>`;
+async function loadWorkerSlots(query) {
+    slotList.innerHTML = `<p class="worker-list__empty">Cargando...</p>`;
 
     try {
-        let url = "/api/admin/workers";
+        let url = "/api/admin/worker-slots";
         if (query) {
             url += `?q=${encodeURIComponent(query)}`;
         }
@@ -158,67 +121,93 @@ async function loadWorkers(query) {
         }
 
         if (!response.ok) {
-            throw new Error("Error al cargar trabajadores");
+            throw new Error("Error al cargar cupos");
         }
 
-        const workers = await response.json();
+        const slots = await response.json();
 
-        if (workers.length === 0) {
-            workerList.innerHTML = `<p class="worker-list__empty">No se encontraron trabajadores.</p>`;
+        if (slots.length === 0) {
+            slotList.innerHTML = `<p class="worker-list__empty">No se encontraron cupos.</p>`;
             return;
         }
 
-        workerList.innerHTML = workers.map(renderWorker).join("");
+        slotList.innerHTML = slots.map(renderWorkerSlot).join("");
 
     } catch (error) {
-        workerList.innerHTML = `<p class="worker-list__empty worker-list__empty--error">${error.message}</p>`;
+        slotList.innerHTML = `<p class="worker-list__empty worker-list__empty--error">${error.message}</p>`;
     }
 }
 
 
-function renderWorker(worker) {
-    const statusClass = worker.active ? "badge--active" : "badge--inactive";
-    const statusText = worker.active ? "Activo" : "Inactivo";
-    const actionLabel = worker.active ? "Desactivar" : "Reactivar";
-    const actionClass = worker.active ? "btn--danger" : "btn--success";
-    const actionEndpoint = worker.active ? "deactivate" : "activate";
+function renderWorkerSlot(slot) {
+    const statusClass = slot.active ? "badge--active" : "badge--inactive";
+    const statusText = slot.active ? "Activo" : "Inactivo";
+    const actionLabel = slot.active ? "Desactivar" : "Reactivar";
+    const actionClass = slot.active ? "btn--danger" : "btn--success";
+    const actionEndpoint = slot.active ? "deactivate" : "activate";
+
+    const displayName = slot.person_name ? escapeHtml(slot.person_name) : '<span class="text-muted">Sin asignar</span>';
+    const assignLabel = slot.person_name ? "Cambiar" : "Asignar";
 
     return `
         <div class="worker-row">
             <div class="worker-row__info">
-                <span class="worker-row__name">${escapeHtml(worker.name)}</span>
-                <span class="worker-row__barcode">${escapeHtml(worker.barcode)}</span>
+                <span class="worker-row__slot">${slot.slot_label}</span>
+                <span class="worker-row__barcode">${escapeHtml(slot.barcode)}</span>
+                <span class="worker-row__name">${displayName}</span>
                 <span class="badge ${statusClass}">${statusText}</span>
             </div>
-            <button
-                class="btn ${actionClass}"
-                type="button"
-                data-worker-id="${worker.id}"
-                data-action="${actionEndpoint}"
-            >
-                ${actionLabel}
-            </button>
+            <div class="worker-row__actions">
+                <button
+                    class="btn btn--primary"
+                    type="button"
+                    data-slot-id="${slot.id}"
+                    data-action="assign"
+                    data-name="${slot.person_name ? escapeHtml(slot.person_name) : ""}"
+                >
+                    ${assignLabel}
+                </button>
+                <button
+                    class="btn ${actionClass}"
+                    type="button"
+                    data-slot-id="${slot.id}"
+                    data-action="${actionEndpoint}"
+                >
+                    ${actionLabel}
+                </button>
+            </div>
         </div>
     `;
 }
 
 
-workerList.addEventListener("click", async (event) => {
+slotList.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-action]");
     if (!button) return;
 
-    const workerId = button.dataset.workerId;
+    const slotId = button.dataset.slotId;
     const action = button.dataset.action;
+
+    if (action === "assign") {
+        const currentName = button.dataset.name || "";
+        assignWorkerId.value = slotId;
+        assignPersonName.value = currentName;
+        assignMessage.hidden = true;
+        assignModal.hidden = false;
+        assignPersonName.focus();
+        return;
+    }
+
     const actionLabel = action === "deactivate" ? "desactivar" : "reactivar";
 
-    if (!confirm(`¿Desea ${actionLabel} este trabajador?`)) {
+    if (!confirm(`¿Desea ${actionLabel} este cupo?`)) {
         return;
     }
 
     button.disabled = true;
 
     try {
-        const response = await fetch(`/api/admin/workers/${workerId}/${action}`, {
+        const response = await fetch(`/api/admin/worker-slots/${slotId}/${action}`, {
             method: "PATCH",
             headers: apiHeaders(),
         });
@@ -233,11 +222,100 @@ workerList.addEventListener("click", async (event) => {
             throw new Error(result.error || "No fue posible cambiar el estado");
         }
 
-        loadWorkers(searchInput.value.trim());
+        loadWorkerSlots(slotSearchInput.value.trim());
 
     } catch (error) {
         alert(error.message);
         button.disabled = false;
+    }
+});
+
+
+assignCancelBtn.addEventListener("click", () => {
+    assignModal.hidden = true;
+});
+
+assignModal.addEventListener("click", (event) => {
+    if (event.target === assignModal) {
+        assignModal.hidden = true;
+    }
+});
+
+
+assignForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const workerId = assignWorkerId.value;
+    const personName = assignPersonName.value.trim();
+
+    if (!personName) {
+        showMessage(assignMessage, "El nombre es requerido.", "error");
+        return;
+    }
+
+    assignSaveBtn.disabled = true;
+    assignSaveBtn.textContent = "Guardando...";
+
+    try {
+        const response = await fetch(`/api/admin/worker-slots/${workerId}/assign`, {
+            method: "PATCH",
+            headers: apiHeaders(),
+            body: JSON.stringify({ person_name: personName }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || "No fue posible asignar la persona");
+        }
+
+        assignModal.hidden = true;
+        loadWorkerSlots(slotSearchInput.value.trim());
+
+    } catch (error) {
+        showMessage(assignMessage, error.message, "error");
+    } finally {
+        assignSaveBtn.disabled = false;
+        assignSaveBtn.textContent = "Guardar";
+    }
+});
+
+
+cleanSlotsBtn.addEventListener("click", async () => {
+    const msg = "Esta acción dejará sin nombre los 150 cupos. Los movimientos e historiales anteriores se conservarán. ¿Desea continuar?";
+
+    if (!confirm(msg)) {
+        return;
+    }
+
+    cleanSlotsBtn.disabled = true;
+    cleanSlotsBtn.textContent = "Limpiando...";
+
+    try {
+        const response = await fetch("/api/admin/worker-slots/clean", {
+            method: "POST",
+            headers: apiHeaders(),
+        });
+
+        if (response.status === 401) {
+            window.location.href = "/admin/login";
+            return;
+        }
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || "No fue posible limpiar las asignaciones");
+        }
+
+        alert(result.message);
+        loadWorkerSlots(slotSearchInput.value.trim());
+
+    } catch (error) {
+        alert(error.message);
+    } finally {
+        cleanSlotsBtn.disabled = false;
+        cleanSlotsBtn.textContent = "Limpiar todas las asignaciones";
     }
 });
 
@@ -287,6 +365,8 @@ async function loadEntries() {
 function renderEntry(entry) {
     const statusClass = entry.voided ? "badge--inactive" : "badge--active";
     const statusText = entry.voided ? "Anulado" : "Activo";
+    const worker = entry.worker;
+    const workerDisplay = `${escapeHtml(worker.slot_label)} — ${escapeHtml(worker.name)} / ${escapeHtml(worker.barcode)}`;
     const voidInfo = entry.voided
         ? `<div class="entry-row__void-info">
                <span class="entry-row__void-reason">Motivo: ${escapeHtml(entry.void_reason)}</span>
@@ -296,14 +376,14 @@ function renderEntry(entry) {
     const voidButton = entry.voided
         ? ""
         : `<button class="btn btn--danger btn--void" type="button" data-entry-id="${entry.id}"
-               data-worker="${escapeHtml(entry.worker.name)} / ${escapeHtml(entry.worker.barcode)}"
+               data-worker="${escapeHtml(worker.slot_label)} — ${escapeHtml(worker.name)} / ${escapeHtml(worker.barcode)}"
                data-weight="${entry.weight_kg}">Anular</button>`;
 
     return `
         <div class="entry-row">
             <div class="entry-row__info">
                 <span class="entry-row__id">#${entry.id}</span>
-                <span class="entry-row__worker">${escapeHtml(entry.worker.name)} / ${escapeHtml(entry.worker.barcode)}</span>
+                <span class="entry-row__worker">${workerDisplay}</span>
                 <span class="entry-row__weight">${entry.weight_kg} kg</span>
                 <span class="entry-row__time">${entry.created_at_local}</span>
                 <span class="badge ${statusClass}">${statusText}</span>
@@ -708,7 +788,7 @@ editProductForm.addEventListener("submit", async (event) => {
 
 
 initCsrfToken().then(() => {
-    loadWorkers();
+    loadWorkerSlots();
     loadEntries();
     loadBackups();
     loadProducts();

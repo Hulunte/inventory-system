@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from app.extensions import db
 from app.models.worker import Worker
+from app.models.worker_assignment import WorkerAssignment
 from app.services.history_service import (
     get_daily_summary,
     get_worker_entries,
@@ -39,13 +40,8 @@ def daily_summary():
     )
 
 
-@history_bp.get("/api/history/workers/<int:worker_id>/entries")
-def worker_entries(worker_id):
-    worker = db.session.get(Worker, worker_id)
-
-    if worker is None:
-        return jsonify({"error": "Worker not found"}), 404
-
+@history_bp.get("/api/history/assignments/<int:assignment_id>/entries")
+def assignment_entries(assignment_id):
     date_str = request.args.get("date")
 
     if date_str:
@@ -57,11 +53,23 @@ def worker_entries(worker_id):
         operational_date = datetime.now(tz).date()
 
     tz = current_app.config["HARVEST_TIMEZONE"]
-    entries = get_worker_entries(worker_id, operational_date, tz)
+    assignment = db.session.get(WorkerAssignment, assignment_id)
+    if assignment is None:
+        return jsonify({"error": "Worker assignment not found."}), 404
+
+    entries = get_worker_entries(assignment_id, operational_date, tz)
 
     serialized = []
+    worker_name = None
+    worker_barcode = None
+    slot_number = None
+
     for entry in entries:
         local_dt = entry.created_at.astimezone(tz)
+        if worker_name is None:
+            worker_name = entry.worker_name_snapshot
+            worker_barcode = entry.worker_barcode_snapshot
+            slot_number = entry.worker_slot_number_snapshot
         serialized.append(
             {
                 "id": entry.id,
@@ -75,13 +83,18 @@ def worker_entries(worker_id):
         Decimal("0.000"),
     )
 
+    slot_label = f"Trabajador {slot_number:03d}" if slot_number else None
+
     return jsonify(
         {
             "date": operational_date.isoformat(),
             "worker": {
-                "id": worker.id,
-                "name": worker.name,
-                "barcode": worker.barcode,
+                "id": assignment.worker_id,
+                "assignment_id": assignment.id,
+                "name": worker_name,
+                "barcode": worker_barcode,
+                "slot_number": slot_number,
+                "slot_label": slot_label,
             },
             "entries": serialized,
             "summary": {

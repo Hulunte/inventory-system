@@ -1,24 +1,17 @@
 import pytest
 from decimal import Decimal, ROUND_HALF_UP
 
-from app.models.worker import Worker
 from app.models.product import Product
 from app.models.harvest_entry import HarvestEntry
 from app.extensions import db
 from app.exceptions import ProductUnavailableError
 from sqlalchemy.exc import IntegrityError
+from tests.conftest import make_worker, make_worker_with_assignment
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _create_worker(db_session, barcode="W100", name="Test Worker"):
-    worker = Worker(barcode=barcode, name=name)
-    db_session.add(worker)
-    db_session.commit()
-    return worker
-
 
 def _create_product(db_session, name="Chile", rate="5.25", active=True):
     product = Product(name=name, rate_per_kg=Decimal(rate), active=active)
@@ -44,7 +37,7 @@ def _register(client, barcode, weight_kg, product_id):
 
 class TestHarvestEntryProductFields:
     def test_new_columns_nullable_for_legacy(self, db_session):
-        worker = _create_worker(db_session)
+        worker = make_worker(db_session)
         entry = HarvestEntry(worker_id=worker.id, weight_kg=Decimal("1.000"))
         db_session.add(entry)
         db_session.commit()
@@ -55,7 +48,7 @@ class TestHarvestEntryProductFields:
         assert entry.amount_mxn is None
 
     def test_new_columns_populated_with_product(self, db_session):
-        worker = _create_worker(db_session)
+        worker = make_worker(db_session)
         product = _create_product(db_session)
         entry = HarvestEntry(
             worker_id=worker.id,
@@ -74,7 +67,7 @@ class TestHarvestEntryProductFields:
         assert entry.amount_mxn == Decimal("18.38")
 
     def test_rate_snapshot_negative_rejected(self, db_session):
-        worker = _create_worker(db_session, barcode="W101")
+        worker = make_worker(db_session)
         product = _create_product(db_session, name="NegRate")
         entry = HarvestEntry(
             worker_id=worker.id,
@@ -90,7 +83,7 @@ class TestHarvestEntryProductFields:
         db_session.rollback()
 
     def test_amount_negative_rejected(self, db_session):
-        worker = _create_worker(db_session, barcode="W102")
+        worker = make_worker(db_session)
         product = _create_product(db_session, name="NegAmt")
         entry = HarvestEntry(
             worker_id=worker.id,
@@ -106,7 +99,7 @@ class TestHarvestEntryProductFields:
         db_session.rollback()
 
     def test_partial_product_fields_rejected(self, db_session):
-        worker = _create_worker(db_session, barcode="W103")
+        worker = make_worker(db_session)
         product = _create_product(db_session, name="PartialFields")
         entry = HarvestEntry(
             worker_id=worker.id,
@@ -135,7 +128,7 @@ class TestHarvestEntryProductFields:
 
 class TestLegacyMovements:
     def test_legacy_entries_have_null_product_fields(self, db_session):
-        worker = _create_worker(db_session, barcode="W200")
+        worker = make_worker(db_session)
         entry = HarvestEntry(worker_id=worker.id, weight_kg=Decimal("2.000"))
         db_session.add(entry)
         db_session.commit()
@@ -147,7 +140,7 @@ class TestLegacyMovements:
         assert loaded.amount_mxn is None
 
     def test_list_entries_includes_null_product_fields(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W201")
+        worker = make_worker(db_session)
         entry = HarvestEntry(worker_id=worker.id, weight_kg=Decimal("2.000"))
         db_session.add(entry)
         db_session.commit()
@@ -168,10 +161,10 @@ class TestLegacyMovements:
 
 class TestRegisterWithProduct:
     def test_successful_registration(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W300")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session)
 
-        resp = _register(client, "W300", 5.000, product.id)
+        resp = _register(client, worker.barcode, 5.000, product.id)
         assert resp.status_code == 201
 
         data = resp.get_json()
@@ -187,16 +180,16 @@ class TestRegisterWithProduct:
         assert "Trabajador" in resp.get_json()["error"]
 
     def test_product_not_found_returns_409(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W301")
-        resp = _register(client, "W301", 5.000, 99999)
+        worker, _ = make_worker_with_assignment(db_session)
+        resp = _register(client, worker.barcode, 5.000, 99999)
         assert resp.status_code == 409
         data = resp.get_json()
         assert data["code"] == "product_unavailable"
 
     def test_inactive_product_returns_409(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W302")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, active=False)
-        resp = _register(client, "W302", 5.000, product.id)
+        resp = _register(client, worker.barcode, 5.000, product.id)
         assert resp.status_code == 409
         data = resp.get_json()
         assert data["code"] == "product_unavailable"
@@ -208,20 +201,20 @@ class TestRegisterWithProduct:
 
 class TestSnapshotCorrectness:
     def test_snapshot_copies_name_and_rate(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W400")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="Cebolla", rate="3.50")
 
-        resp = _register(client, "W400", 2.000, product.id)
+        resp = _register(client, worker.barcode, 2.000, product.id)
         data = resp.get_json()
 
         assert data["product_name"] == "Cebolla"
         assert data["rate_per_kg"] == "3.50"
 
     def test_name_price_change_preserves_old_snapshot(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W401")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="Chile", rate="5.00")
 
-        resp1 = _register(client, "W401", 1.000, product.id)
+        resp1 = _register(client, worker.barcode, 1.000, product.id)
         data1 = resp1.get_json()
         entry_id = data1["id"]
 
@@ -229,7 +222,7 @@ class TestSnapshotCorrectness:
         product.rate_per_kg = Decimal("8.00")
         db_session.commit()
 
-        resp2 = _register(client, "W401", 2.000, product.id)
+        resp2 = _register(client, worker.barcode, 2.000, product.id)
         data2 = resp2.get_json()
 
         assert data1["product_name"] == "Chile"
@@ -250,53 +243,53 @@ class TestSnapshotCorrectness:
 
 class TestAmountCalculation:
     def test_exact_calculation(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W500")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, rate="3.33")
 
-        resp = _register(client, "W500", 3.000, product.id)
+        resp = _register(client, worker.barcode, 3.000, product.id)
         data = resp.get_json()
         assert data["amount_mxn"] == "9.99"
 
     def test_round_half_up_exact_half_cent(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W501")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, rate="5.00")
 
-        resp = _register(client, "W501", 0.001, product.id)
+        resp = _register(client, worker.barcode, 0.001, product.id)
         assert resp.status_code == 201
         data = resp.get_json()
         assert data["amount_mxn"] == "0.01"
 
     def test_large_weight(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W502")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, rate="10.00")
 
-        resp = _register(client, "W502", 999.999, product.id)
+        resp = _register(client, worker.barcode, 999.999, product.id)
         data = resp.get_json()
         assert data["amount_mxn"] == "9999.99"
 
     def test_zero_rate(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W503")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, rate="0.00")
 
-        resp = _register(client, "W503", 5.000, product.id)
+        resp = _register(client, worker.barcode, 5.000, product.id)
         data = resp.get_json()
         assert data["amount_mxn"] == "0.00"
 
     def test_price_has_exactly_two_decimals(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W504")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, rate="3.00")
 
-        resp = _register(client, "W504", 2.000, product.id)
+        resp = _register(client, worker.barcode, 2.000, product.id)
         data = resp.get_json()
         assert data["rate_per_kg"] == "3.00"
         parts = data["amount_mxn"].split(".")
         assert len(parts) == 2 and len(parts[1]) == 2
 
     def test_success_returns_backend_applied_price(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W505")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, rate="7.50")
 
-        resp = _register(client, "W505", 1.000, product.id)
+        resp = _register(client, worker.barcode, 1.000, product.id)
         data = resp.get_json()
         assert data["rate_per_kg"] == "7.50"
         assert data["amount_mxn"] == "7.50"
@@ -317,67 +310,67 @@ class TestProductIdValidation:
         {},
     ])
     def test_invalid_product_id_type(self, client, db_session, bad_id):
-        worker = _create_worker(db_session, barcode="W600")
+        worker, _ = make_worker_with_assignment(db_session)
         resp = client.post(
             "/api/harvest/entries",
-            json={"barcode": "W600", "weight_kg": 5.0, "product_id": bad_id},
+            json={"barcode": worker.barcode, "weight_kg": 5.0, "product_id": bad_id},
         )
         assert resp.status_code == 400
 
     def test_negative_product_id(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W601")
+        worker, _ = make_worker_with_assignment(db_session)
         resp = client.post(
             "/api/harvest/entries",
-            json={"barcode": "W601", "weight_kg": 5.0, "product_id": -1},
+            json={"barcode": worker.barcode, "weight_kg": 5.0, "product_id": -1},
         )
         assert resp.status_code == 400
 
     def test_zero_product_id(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W602")
+        worker, _ = make_worker_with_assignment(db_session)
         resp = client.post(
             "/api/harvest/entries",
-            json={"barcode": "W602", "weight_kg": 5.0, "product_id": 0},
+            json={"barcode": worker.barcode, "weight_kg": 5.0, "product_id": 0},
         )
         assert resp.status_code == 400
 
     def test_missing_product_id(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W603")
+        worker, _ = make_worker_with_assignment(db_session)
         resp = client.post(
             "/api/harvest/entries",
-            json={"barcode": "W603", "weight_kg": 5.0},
+            json={"barcode": worker.barcode, "weight_kg": 5.0},
         )
         assert resp.status_code == 400
         assert "product_id" in resp.get_json()["error"]
 
     def test_service_raises_valueerror_for_bool(self, db_session):
-        _create_worker(db_session, barcode="W610")
+        worker, _ = make_worker_with_assignment(db_session)
         from app.services.harvest_service import register_harvest
         with pytest.raises(ValueError, match="product_id"):
-            register_harvest("W610", Decimal("5.000"), True)
+            register_harvest(worker.barcode, Decimal("5.000"), True)
 
     def test_service_raises_valueerror_for_none(self, db_session):
-        _create_worker(db_session, barcode="W611")
+        worker, _ = make_worker_with_assignment(db_session)
         from app.services.harvest_service import register_harvest
         with pytest.raises(ValueError, match="product_id"):
-            register_harvest("W611", Decimal("5.000"), None)
+            register_harvest(worker.barcode, Decimal("5.000"), None)
 
     def test_service_raises_valueerror_for_string(self, db_session):
-        _create_worker(db_session, barcode="W612")
+        worker, _ = make_worker_with_assignment(db_session)
         from app.services.harvest_service import register_harvest
         with pytest.raises(ValueError, match="product_id"):
-            register_harvest("W612", Decimal("5.000"), "abc")
+            register_harvest(worker.barcode, Decimal("5.000"), "abc")
 
     def test_service_raises_valueerror_for_zero(self, db_session):
-        _create_worker(db_session, barcode="W613")
+        worker, _ = make_worker_with_assignment(db_session)
         from app.services.harvest_service import register_harvest
         with pytest.raises(ValueError, match="product_id"):
-            register_harvest("W613", Decimal("5.000"), 0)
+            register_harvest(worker.barcode, Decimal("5.000"), 0)
 
     def test_service_raises_valueerror_for_negative(self, db_session):
-        _create_worker(db_session, barcode="W614")
+        worker, _ = make_worker_with_assignment(db_session)
         from app.services.harvest_service import register_harvest
         with pytest.raises(ValueError, match="product_id"):
-            register_harvest("W614", Decimal("5.000"), -1)
+            register_harvest(worker.barcode, Decimal("5.000"), -1)
 
 
 # ---------------------------------------------------------------------------
@@ -386,32 +379,32 @@ class TestProductIdValidation:
 
 class TestNoPartialData:
     def test_no_entry_created_on_invalid_product(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W700")
+        worker, _ = make_worker_with_assignment(db_session)
         count_before = HarvestEntry.query.count()
 
-        resp = _register(client, "W700", 5.000, 99999)
+        resp = _register(client, worker.barcode, 5.000, 99999)
         assert resp.status_code == 409
 
         count_after = HarvestEntry.query.count()
         assert count_after == count_before
 
     def test_no_entry_on_inactive_product(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W701")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, active=False)
         count_before = HarvestEntry.query.count()
 
-        resp = _register(client, "W701", 5.000, product.id)
+        resp = _register(client, worker.barcode, 5.000, product.id)
         assert resp.status_code == 409
 
         count_after = HarvestEntry.query.count()
         assert count_after == count_before
 
     def test_no_entry_on_invalid_weight(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W702")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="W702Prod")
         count_before = HarvestEntry.query.count()
 
-        resp = _register(client, "W702", 0, product.id)
+        resp = _register(client, worker.barcode, 0, product.id)
         assert resp.status_code == 400
 
         count_after = HarvestEntry.query.count()
@@ -476,35 +469,35 @@ class TestActiveProductsEndpoint:
 
 class TestExistingEndpointsRegression:
     def test_register_harvest_still_works_with_product(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W900")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session)
 
-        resp = _register(client, "W900", 7.250, product.id)
+        resp = _register(client, worker.barcode, 7.250, product.id)
         assert resp.status_code == 201
         data = resp.get_json()
         assert "daily_total" in data
         assert "worker" in data
 
     def test_daily_total_endpoint(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W901")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session)
 
-        _register(client, "W901", 3.000, product.id)
-        _register(client, "W901", 2.000, product.id)
+        _register(client, worker.barcode, 3.000, product.id)
+        _register(client, worker.barcode, 2.000, product.id)
 
-        resp = client.get("/api/harvest/daily/W901")
+        resp = client.get(f"/api/harvest/daily/{worker.barcode}")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["daily_total"] == "5.000"
 
     def test_invalid_weight_still_rejected(self, client, db_session):
-        worker = _create_worker(db_session, barcode="W902")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="W902Prod")
 
-        resp = _register(client, "W902", 0, product.id)
+        resp = _register(client, worker.barcode, 0, product.id)
         assert resp.status_code == 400
 
-        resp = _register(client, "W902", -5, product.id)
+        resp = _register(client, worker.barcode, -5, product.id)
         assert resp.status_code == 400
 
 
@@ -557,11 +550,11 @@ class TestJsonValidation:
         assert resp.status_code == 400
 
     def test_unknown_fields_rejected(self, client, db_session):
-        _create_worker(db_session, barcode="W800")
+        worker, _ = make_worker_with_assignment(db_session)
         resp = client.post(
             "/api/harvest/entries",
             json={
-                "barcode": "W800",
+                "barcode": worker.barcode,
                 "weight_kg": 5.0,
                 "product_id": 1,
                 "extra_field": "bad",
@@ -571,29 +564,29 @@ class TestJsonValidation:
         assert "extra_field" in resp.get_json()["error"]
 
     def test_weight_kg_bool_rejected(self, client, db_session):
-        _create_worker(db_session, barcode="W801")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="W801Prod")
         resp = client.post(
             "/api/harvest/entries",
-            json={"barcode": "W801", "weight_kg": True, "product_id": product.id},
+            json={"barcode": worker.barcode, "weight_kg": True, "product_id": product.id},
         )
         assert resp.status_code == 400
 
     def test_weight_kg_nan_rejected(self, client, db_session):
-        _create_worker(db_session, barcode="W802")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="W802Prod")
         resp = client.post(
             "/api/harvest/entries",
-            json={"barcode": "W802", "weight_kg": "NaN", "product_id": product.id},
+            json={"barcode": worker.barcode, "weight_kg": "NaN", "product_id": product.id},
         )
         assert resp.status_code == 400
 
     def test_weight_kg_infinite_rejected(self, client, db_session):
-        _create_worker(db_session, barcode="W803")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="W803Prod")
         resp = client.post(
             "/api/harvest/entries",
-            json={"barcode": "W803", "weight_kg": "Infinity", "product_id": product.id},
+            json={"barcode": worker.barcode, "weight_kg": "Infinity", "product_id": product.id},
         )
         assert resp.status_code == 400
 
@@ -604,41 +597,41 @@ class TestJsonValidation:
 
 class TestWeightPrecision:
     def test_four_decimals_rejected(self, client, db_session):
-        worker = _create_worker(db_session, barcode="WP01")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="WPP1")
-        resp = _register(client, "WP01", "1.2345", product.id)
+        resp = _register(client, worker.barcode, "1.2345", product.id)
         assert resp.status_code == 400
 
     def test_no_entry_on_too_many_decimals(self, client, db_session):
-        worker = _create_worker(db_session, barcode="WP02")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="WPP2")
         count_before = HarvestEntry.query.count()
-        resp = _register(client, "WP02", "1.2345", product.id)
+        resp = _register(client, worker.barcode, "1.2345", product.id)
         assert resp.status_code == 400
         assert HarvestEntry.query.count() == count_before
 
     def test_three_decimals_accepted(self, client, db_session):
-        worker = _create_worker(db_session, barcode="WP03")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="WPP3")
-        resp = _register(client, "WP03", "5.000", product.id)
+        resp = _register(client, worker.barcode, "5.000", product.id)
         assert resp.status_code == 201
 
     def test_integer_accepted(self, client, db_session):
-        worker = _create_worker(db_session, barcode="WP04")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="WPP4")
-        resp = _register(client, "WP04", "5", product.id)
+        resp = _register(client, worker.barcode, "5", product.id)
         assert resp.status_code == 201
 
     def test_one_decimal_accepted(self, client, db_session):
-        worker = _create_worker(db_session, barcode="WP05")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="WPP5")
-        resp = _register(client, "WP05", "5.0", product.id)
+        resp = _register(client, worker.barcode, "5.0", product.id)
         assert resp.status_code == 201
 
     def test_two_decimals_accepted(self, client, db_session):
-        worker = _create_worker(db_session, barcode="WP06")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="WPP6")
-        resp = _register(client, "WP06", "5.00", product.id)
+        resp = _register(client, worker.barcode, "5.00", product.id)
         assert resp.status_code == 201
 
 
@@ -648,17 +641,17 @@ class TestWeightPrecision:
 
 class TestProductUnavailableError:
     def test_nonexistent_product_raises_error(self, db_session):
-        _create_worker(db_session, barcode="W850")
+        worker, _ = make_worker_with_assignment(db_session)
         from app.services.harvest_service import register_harvest
         with pytest.raises(ProductUnavailableError):
-            register_harvest("W850", Decimal("5.000"), 99999)
+            register_harvest(worker.barcode, Decimal("5.000"), 99999)
 
     def test_inactive_product_raises_error(self, db_session):
-        _create_worker(db_session, barcode="W851")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="InactiveP", active=False)
         from app.services.harvest_service import register_harvest
         with pytest.raises(ProductUnavailableError):
-            register_harvest("W851", Decimal("5.000"), product.id)
+            register_harvest(worker.barcode, Decimal("5.000"), product.id)
 
     def test_worker_not_found_still_returns_none(self, db_session):
         from app.services.harvest_service import register_harvest
@@ -676,23 +669,23 @@ class TestHttpEndpointDifferentiation:
         resp_404 = _register(client, "GHOST", 5.000, 1)
         assert resp_404.status_code == 404
 
-        worker = _create_worker(db_session, barcode="W860")
-        resp_409 = _register(client, "W860", 5.000, 99999)
+        worker, _ = make_worker_with_assignment(db_session)
+        resp_409 = _register(client, worker.barcode, 5.000, 99999)
         assert resp_409.status_code == 409
 
     def test_response_409_contains_product_unavailable_code(
         self, client, db_session
     ):
-        worker = _create_worker(db_session, barcode="W870")
-        resp = _register(client, "W870", 5.000, 99999)
+        worker, _ = make_worker_with_assignment(db_session)
+        resp = _register(client, worker.barcode, 5.000, 99999)
         data = resp.get_json()
         assert resp.status_code == 409
         assert data["code"] == "product_unavailable"
         assert "error" in data
 
     def test_valueerror_returns_400_not_409(self, client, db_session):
-        _create_worker(db_session, barcode="W871")
-        resp = _register(client, "W871", 5.000, True)
+        worker, _ = make_worker_with_assignment(db_session)
+        resp = _register(client, worker.barcode, 5.000, True)
         assert resp.status_code == 400
 
 
@@ -703,7 +696,7 @@ class TestHttpEndpointDifferentiation:
 class TestForUpdateLocking:
     def test_for_update_in_executed_sql(self, client, db_session):
         from sqlalchemy import event
-        worker = _create_worker(db_session, barcode="W880")
+        worker, _ = make_worker_with_assignment(db_session)
         product = _create_product(db_session, name="LockTest")
 
         seen_statements = []
@@ -713,7 +706,7 @@ class TestForUpdateLocking:
 
         event.listen(db.engine, "before_cursor_execute", _capture)
         try:
-            resp = _register(client, "W880", 1.000, product.id)
+            resp = _register(client, worker.barcode, 1.000, product.id)
             assert resp.status_code == 201
             for_update_clauses = [
                 s for s in seen_statements

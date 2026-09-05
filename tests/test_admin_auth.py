@@ -3,6 +3,7 @@ from werkzeug.security import generate_password_hash
 
 from app.models.worker import Worker
 from app.extensions import db
+from tests.conftest import make_worker
 
 
 class TestSessionEndpoint:
@@ -188,41 +189,32 @@ class TestAdminPageAccess:
 
 
 class TestAdminAPIProtection:
-    def test_list_workers_no_auth(self, client):
-        response = client.get("/api/admin/workers")
+    def test_list_worker_slots_no_auth(self, client):
+        response = client.get("/api/admin/worker-slots")
         assert response.status_code == 401
         data = response.get_json()
         assert "error" in data
 
-    def test_get_worker_no_auth(self, client, db_session):
-        worker = Worker(barcode="AUTH001", name="Auth Test")
-        db_session.add(worker)
-        db_session.commit()
-
-        response = client.get(f"/api/admin/workers/{worker.id}")
+    def test_export_worker_slots_no_auth(self, client):
+        response = client.get("/api/admin/worker-slots/export")
         assert response.status_code == 401
 
-    def test_create_worker_no_auth(self, client):
-        response = client.post(
-            "/api/admin/workers",
-            json={"name": "Test", "barcode": "AUTH002"},
-        )
+    def test_clean_worker_slots_no_auth(self, client):
+        response = client.post("/api/admin/worker-slots/clean")
         assert response.status_code == 401
 
-    def test_deactivate_worker_no_auth(self, client, db_session):
-        worker = Worker(barcode="AUTH003", name="Deactivate Test")
-        db_session.add(worker)
+    def test_deactivate_worker_slot_no_auth(self, client, db_session):
+        worker = make_worker(db_session)
         db_session.commit()
 
-        response = client.patch(f"/api/admin/workers/{worker.id}/deactivate")
+        response = client.patch(f"/api/admin/worker-slots/{worker.id}/deactivate")
         assert response.status_code == 401
 
-    def test_activate_worker_no_auth(self, client, db_session):
-        worker = Worker(barcode="AUTH004", name="Activate Test", active=False)
-        db_session.add(worker)
+    def test_activate_worker_slot_no_auth(self, client, db_session):
+        worker = make_worker(db_session, active=False)
         db_session.commit()
 
-        response = client.patch(f"/api/admin/workers/{worker.id}/activate")
+        response = client.patch(f"/api/admin/worker-slots/{worker.id}/activate")
         assert response.status_code == 401
 
     def test_harvest_entries_no_auth(self, client):
@@ -234,8 +226,7 @@ class TestAdminAPIProtection:
         from decimal import Decimal
         from datetime import datetime, timezone
 
-        worker = Worker(barcode="AUTH005", name="Void Test")
-        db_session.add(worker)
+        worker = make_worker(db_session)
         db_session.flush()
 
         entry = HarvestEntry(worker_id=worker.id, weight_kg=Decimal("5.000"), created_at=datetime.now(timezone.utc))
@@ -250,62 +241,65 @@ class TestAdminAPIProtection:
 
 
 class TestAdminWorkerActionsAuthenticated:
-    def test_create_worker(self, admin_client):
+    def test_clean_worker_slots(self, admin_client, db_session):
+        make_worker(db_session)
+        make_worker(db_session)
+        db_session.commit()
+
         csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
         response = admin_client.post(
-            "/api/admin/workers",
-            json={"name": "New Worker", "barcode": "AUTH006"},
+            "/api/admin/worker-slots/clean",
             headers={"X-CSRF-Token": csrf},
         )
-        assert response.status_code == 201
+        assert response.status_code == 200
         data = response.get_json()
-        assert data["name"] == "New Worker"
+        assert "count" in data
 
-    def test_deactivate_worker(self, admin_client, db_session):
-        worker = Worker(barcode="AUTH007", name="Deactivate Me")
-        db_session.add(worker)
+    def test_deactivate_worker_slot(self, admin_client, db_session):
+        worker = make_worker(db_session)
         db_session.commit()
 
         csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
         response = admin_client.patch(
-            f"/api/admin/workers/{worker.id}/deactivate",
+            f"/api/admin/worker-slots/{worker.id}/deactivate",
             headers={"X-CSRF-Token": csrf},
         )
         assert response.status_code == 200
-        assert response.get_json()["active"] is False
+        data = response.get_json()
+        assert data["active"] is False
 
-    def test_activate_worker(self, admin_client, db_session):
-        worker = Worker(barcode="AUTH008", name="Activate Me", active=False)
-        db_session.add(worker)
+    def test_activate_worker_slot(self, admin_client, db_session):
+        worker = make_worker(db_session, active=False)
         db_session.commit()
 
         csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
         response = admin_client.patch(
-            f"/api/admin/workers/{worker.id}/activate",
+            f"/api/admin/worker-slots/{worker.id}/activate",
             headers={"X-CSRF-Token": csrf},
         )
         assert response.status_code == 200
-        assert response.get_json()["active"] is True
+        data = response.get_json()
+        assert data["active"] is True
 
-    def test_create_worker_no_csrf(self, admin_client):
+    def test_clean_worker_slots_no_csrf(self, admin_client, db_session):
+        make_worker(db_session)
+        db_session.commit()
+
         response = admin_client.post(
-            "/api/admin/workers",
-            json={"name": "No CSRF", "barcode": "AUTH009"},
+            "/api/admin/worker-slots/clean",
         )
         assert response.status_code == 403
 
-    def test_deactivate_worker_no_csrf(self, admin_client, db_session):
-        worker = Worker(barcode="AUTH010", name="No CSRF Deact")
-        db_session.add(worker)
+    def test_deactivate_worker_slot_no_csrf(self, admin_client, db_session):
+        worker = make_worker(db_session)
         db_session.commit()
 
-        response = admin_client.patch(f"/api/admin/workers/{worker.id}/deactivate")
+        response = admin_client.patch(f"/api/admin/worker-slots/{worker.id}/deactivate")
         assert response.status_code == 403
 
-    def test_activate_worker_no_csrf(self, admin_client, db_session):
-        worker = Worker(barcode="AUTH011", name="No CSRF Act", active=False)
-        db_session.add(worker)
+    def test_activate_worker_slot_no_csrf(self, admin_client, db_session):
+        worker = make_worker(db_session, active=False)
         db_session.commit()
 
-        response = admin_client.patch(f"/api/admin/workers/{worker.id}/activate")
+        response = admin_client.patch(f"/api/admin/worker-slots/{worker.id}/activate")
         assert response.status_code == 403

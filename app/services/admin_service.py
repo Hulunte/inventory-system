@@ -17,7 +17,6 @@ def verify_admin_password(password):
 
 
 def _format_voided_at_local(voided_at_utc, tz):
-    """Convert a UTC voided_at timestamp to a local DD/MM/YYYY HH:MM:SS string."""
     if voided_at_utc is None:
         return None
     return voided_at_utc.astimezone(tz).strftime("%d/%m/%Y %H:%M:%S")
@@ -48,6 +47,8 @@ def get_harvest_entries_for_admin(operational_date, query_filter=None, tz=None):
             db.or_(
                 Worker.name.ilike(pattern),
                 Worker.barcode.ilike(pattern),
+                HarvestEntry.worker_name_snapshot.ilike(pattern),
+                HarvestEntry.worker_barcode_snapshot.ilike(pattern),
             )
         )
 
@@ -56,12 +57,19 @@ def get_harvest_entries_for_admin(operational_date, query_filter=None, tz=None):
     entries = []
     for entry, worker in rows:
         local_dt = entry.created_at.astimezone(tz)
+
+        worker_name = entry.worker_name_snapshot or worker.name or ""
+        worker_barcode = entry.worker_barcode_snapshot or worker.barcode
+        slot_number = entry.worker_slot_number_snapshot or worker.slot_number
+
         entry_data = {
             "id": entry.id,
             "worker": {
                 "id": worker.id,
-                "barcode": worker.barcode,
-                "name": worker.name,
+                "barcode": worker_barcode,
+                "name": worker_name,
+                "slot_number": slot_number,
+                "slot_label": f"Trabajador {slot_number:03d}",
             },
             "weight_kg": str(entry.weight_kg),
             "created_at": entry.created_at.isoformat(),

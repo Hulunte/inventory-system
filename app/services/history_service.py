@@ -41,50 +41,62 @@ def get_daily_summary(operational_date, query_filter=None, tz=None):
 
     q = (
         db.session.query(
-            Worker.id,
-            Worker.name,
-            Worker.barcode,
+            HarvestEntry.worker_id,
+            HarvestEntry.worker_assignment_id,
+            HarvestEntry.worker_slot_number_snapshot,
+            HarvestEntry.worker_name_snapshot,
+            HarvestEntry.worker_barcode_snapshot,
             func.count(HarvestEntry.id).label("entries_count"),
             func.coalesce(func.sum(HarvestEntry.weight_kg), 0).label("total_weight_kg"),
         )
-        .join(HarvestEntry, Worker.id == HarvestEntry.worker_id)
         .filter(
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
             HarvestEntry.voided == False,
         )
-        .group_by(Worker.id, Worker.name, Worker.barcode)
-        .order_by(Worker.name.asc())
+        .group_by(
+            HarvestEntry.worker_id,
+            HarvestEntry.worker_assignment_id,
+            HarvestEntry.worker_slot_number_snapshot,
+            HarvestEntry.worker_name_snapshot,
+            HarvestEntry.worker_barcode_snapshot,
+        )
+        .order_by(HarvestEntry.worker_slot_number_snapshot.asc().nullslast())
     )
 
     if query_filter:
         pattern = f"%{query_filter}%"
         q = q.filter(
             db.or_(
-                Worker.name.ilike(pattern),
-                Worker.barcode.ilike(pattern),
+                HarvestEntry.worker_name_snapshot.ilike(pattern),
+                HarvestEntry.worker_barcode_snapshot.ilike(pattern),
             )
         )
 
     rows = q.all()
 
-    workers_data = [
-        {
-            "worker_id": r.id,
-            "name": r.name,
-            "barcode": r.barcode,
-            "entries_count": r.entries_count,
-            "total_weight_kg": str(Decimal(str(r.total_weight_kg))),
-        }
-        for r in rows
-    ]
-
+    workers_data = []
     total_entries = 0
     total_weight = Decimal("0.000")
 
-    for row in workers_data:
-        total_entries += row["entries_count"]
-        total_weight += Decimal(row["total_weight_kg"])
+    for r in rows:
+        worker_weight = Decimal(str(r.total_weight_kg))
+
+        slot_num = r.worker_slot_number_snapshot
+        slot_label = f"Trabajador {slot_num:03d}" if slot_num else None
+
+        workers_data.append({
+            "worker_id": r.worker_id,
+            "worker_assignment_id": r.worker_assignment_id,
+            "slot_number": slot_num,
+            "slot_label": slot_label,
+            "name": r.worker_name_snapshot,
+            "barcode": r.worker_barcode_snapshot,
+            "entries_count": r.entries_count,
+            "total_weight_kg": str(worker_weight),
+        })
+        total_entries += r.entries_count
+        total_weight += worker_weight
 
     return {
         "workers": workers_data,
@@ -95,7 +107,7 @@ def get_daily_summary(operational_date, query_filter=None, tz=None):
     }
 
 
-def get_worker_entries(worker_id, operational_date, tz=None):
+def get_worker_entries(assignment_id, operational_date, tz=None):
     if tz is None:
         tz = _get_tz()
     start_utc, end_utc = _date_range_to_utc(operational_date, tz)
@@ -103,7 +115,7 @@ def get_worker_entries(worker_id, operational_date, tz=None):
     entries = (
         HarvestEntry.query
         .filter(
-            HarvestEntry.worker_id == worker_id,
+            HarvestEntry.worker_assignment_id == assignment_id,
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
             HarvestEntry.voided == False,

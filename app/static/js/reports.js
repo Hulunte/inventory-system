@@ -129,6 +129,7 @@ async function loadReport() {
             <table class="summary-table">
                 <thead>
                     <tr>
+                        <th>Cupo</th>
                         <th>Trabajador</th>
                         <th>Código</th>
                         <th class="num">Tandas</th>
@@ -138,8 +139,9 @@ async function loadReport() {
                 <tbody>
                     ${data.workers.map(w => `
                         <tr>
-                            <td>${escapeHtml(w.name)}</td>
-                            <td class="mono">${escapeHtml(w.barcode)}</td>
+                            <td>${w.slot_label ? escapeHtml(w.slot_label) : "—"}</td>
+                            <td>${w.name ? escapeHtml(w.name) : "Sin asignar"}</td>
+                            <td class="mono">${w.barcode ? escapeHtml(w.barcode) : "—"}</td>
                             <td class="num">${w.entries_count}</td>
                             <td class="num bold">${w.total_weight_kg}</td>
                         </tr>
@@ -147,7 +149,7 @@ async function loadReport() {
                 </tbody>
                 <tfoot>
                     <tr class="summary-total">
-                        <td colspan="2">TOTAL</td>
+                        <td colspan="3">TOTAL</td>
                         <td class="num">${data.summary.total_entries}</td>
                         <td class="num bold">${data.summary.total_weight_kg}</td>
                     </tr>
@@ -168,8 +170,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-
-// --- Week buttons ---
 
 const weekCurrentBtn = document.getElementById("week-current-btn");
 const weekPreviousBtn = document.getElementById("week-previous-btn");
@@ -198,8 +198,6 @@ if (weekPreviousBtn) {
     });
 }
 
-
-// --- Export button ---
 
 const exportBtn = document.getElementById("export-btn");
 

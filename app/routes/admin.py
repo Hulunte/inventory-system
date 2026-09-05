@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime, timezone
 from functools import wraps
 
-from flask import Blueprint, jsonify, session, request
+from flask import Blueprint, Response, jsonify, session, request
 from werkzeug.security import check_password_hash
 
 from app.extensions import db
@@ -13,6 +13,7 @@ from app.services.admin_service import (
     void_harvest_entry,
 )
 from app.services.backup_service import create_backup, list_backups
+from app.services.export_service import generate_credentials_export
 from app.services.product_service import (
     DuplicateProductError,
     activate_product,
@@ -22,13 +23,17 @@ from app.services.product_service import (
     serialize_product,
     update_product,
 )
-from app.services.worker_service import (
-    activate_worker,
-    create_worker,
-    deactivate_worker,
-    get_worker_by_id,
-    search_workers,
+from app.services.worker_slot_service import (
+    activate_slot,
+    assign_person,
+    clean_all_assignments,
+    deactivate_slot,
+    get_worker_slot_by_id,
+    search_worker_slots,
+    serialize_worker_slot_full,
+    validate_person_name,
 )
+from app.models.worker_assignment import WorkerAssignment
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -99,119 +104,105 @@ def logout():
     return jsonify({"message": "Logged out"})
 
 
-@admin_bp.get("/api/admin/workers")
+@admin_bp.get("/api/admin/worker-slots")
 @require_admin
-def list_workers():
+def list_worker_slots():
     query = request.args.get("q", "").strip() or None
-    workers = search_workers(query)
+    include_inactive = request.args.get("include_inactive", "").lower() == "true"
+    workers = search_worker_slots(query, include_inactive=include_inactive)
 
-    return jsonify(
-        [
-            {
-                "id": w.id,
-                "barcode": w.barcode,
-                "name": w.name,
-                "active": w.active,
-                "created_at": w.created_at.isoformat(),
-            }
-            for w in workers
-        ]
-    )
+    worker_ids = [w.id for w in workers]
+    open_assignments = WorkerAssignment.query.filter(
+        WorkerAssignment.worker_id.in_(worker_ids),
+        WorkerAssignment.ended_at.is_(None),
+    ).all()
+    assignments_by_worker = {a.worker_id: a for a in open_assignments}
 
+    result = []
+    for w in workers:
+        assignment = assignments_by_worker.get(w.id)
+        result.append(serialize_worker_slot_full(w, assignment))
 
-@admin_bp.get("/api/admin/workers/<int:worker_id>")
-@require_admin
-def get_worker(worker_id):
-    worker = get_worker_by_id(worker_id)
-
-    if worker is None:
-        return jsonify({"error": "Worker not found"}), 404
-
-    return jsonify(
-        {
-            "id": worker.id,
-            "barcode": worker.barcode,
-            "name": worker.name,
-            "active": worker.active,
-            "created_at": worker.created_at.isoformat(),
-        }
-    )
+    return jsonify(result)
 
 
-@admin_bp.post("/api/admin/workers")
+@admin_bp.patch("/api/admin/worker-slots/<int:worker_id>/assign")
 @require_admin
 @require_csrf
-def create():
-    data = request.get_json()
+def assign_worker_slot(worker_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
 
-    if not data:
-        return jsonify({"error": "Invalid JSON body"}), 400
+    KNOWN_FIELDS = {"person_name"}
+    unknown = set(data.keys()) - KNOWN_FIELDS
+    if unknown:
+        return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
 
-    name = (data.get("name") or "").strip()
-    barcode = (data.get("barcode") or "").strip()
+    person_name = data.get("person_name")
+    if person_name is None:
+        return jsonify({"error": "person_name is required"}), 400
 
-    if not name:
-        return jsonify({"error": "name is required"}), 400
+    try:
+        assignment = assign_person(worker_id, person_name)
+    except ValueError as e:
+        error_msg = str(e)
+        if error_msg == "Worker not found":
+            return jsonify({"error": error_msg}), 404
+        if error_msg == "Cannot assign to an inactive slot":
+            return jsonify({"error": error_msg}), 409
+        return jsonify({"error": error_msg}), 400
 
-    if not barcode:
-        return jsonify({"error": "barcode is required"}), 400
-
-    existing = Worker.query.filter_by(barcode=barcode).first()
-
-    if existing:
-        return jsonify({"error": "Barcode already exists"}), 409
-
-    worker = create_worker(name=name, barcode=barcode)
-
-    return (
-        jsonify(
-            {
-                "id": worker.id,
-                "barcode": worker.barcode,
-                "name": worker.name,
-                "active": worker.active,
-                "created_at": worker.created_at.isoformat(),
-            }
-        ),
-        201,
-    )
+    worker = get_worker_slot_by_id(worker_id)
+    return jsonify(serialize_worker_slot_full(worker, assignment)), 200
 
 
-@admin_bp.patch("/api/admin/workers/<int:worker_id>/deactivate")
+@admin_bp.post("/api/admin/worker-slots/clean")
 @require_admin
 @require_csrf
-def deactivate(worker_id):
-    worker = deactivate_worker(worker_id)
-
-    if worker is None:
-        return jsonify({"error": "Worker not found"}), 404
-
-    return jsonify(
-        {
-            "id": worker.id,
-            "barcode": worker.barcode,
-            "name": worker.name,
-            "active": worker.active,
-        }
-    )
+def clean_worker_slots():
+    count = clean_all_assignments()
+    return jsonify({"message": f"Se limpiaron {count} asignaciones.", "count": count})
 
 
-@admin_bp.patch("/api/admin/workers/<int:worker_id>/activate")
+@admin_bp.patch("/api/admin/worker-slots/<int:worker_id>/activate")
 @require_admin
 @require_csrf
-def activate(worker_id):
-    worker = activate_worker(worker_id)
-
+def activate_worker_slot(worker_id):
+    worker = activate_slot(worker_id)
     if worker is None:
         return jsonify({"error": "Worker not found"}), 404
+    assignment = WorkerAssignment.query.filter_by(
+        worker_id=worker.id, ended_at=None
+    ).first()
+    return jsonify(serialize_worker_slot_full(worker, assignment))
 
-    return jsonify(
-        {
-            "id": worker.id,
-            "barcode": worker.barcode,
-            "name": worker.name,
-            "active": worker.active,
-        }
+
+@admin_bp.patch("/api/admin/worker-slots/<int:worker_id>/deactivate")
+@require_admin
+@require_csrf
+def deactivate_worker_slot(worker_id):
+    worker = deactivate_slot(worker_id)
+    if worker is None:
+        return jsonify({"error": "Worker not found"}), 404
+    assignment = WorkerAssignment.query.filter_by(
+        worker_id=worker.id, ended_at=None
+    ).first()
+    return jsonify(serialize_worker_slot_full(worker, assignment))
+
+
+@admin_bp.get("/api/admin/worker-slots/export")
+@require_admin
+def export_worker_slots():
+    xlsx_bytes = generate_credentials_export()
+    filename = "credenciales_trabajadores.xlsx"
+
+    return Response(
+        xlsx_bytes,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
     )
 
 
@@ -369,12 +360,18 @@ def void_entry(entry_id):
 
     worker = entry.worker
 
+    worker_name = entry.worker_name_snapshot or worker.name or ""
+    worker_barcode = entry.worker_barcode_snapshot or worker.barcode
+    slot_number = entry.worker_slot_number_snapshot or worker.slot_number
+
     return jsonify({
         "id": entry.id,
         "worker": {
             "id": worker.id,
-            "barcode": worker.barcode,
-            "name": worker.name,
+            "barcode": worker_barcode,
+            "name": worker_name,
+            "slot_number": slot_number,
+            "slot_label": f"Trabajador {slot_number:03d}",
         },
         "weight_kg": str(entry.weight_kg),
         "created_at": entry.created_at.isoformat(),

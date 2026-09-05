@@ -30,6 +30,13 @@ class HarvestEntry(db.Model):
             "AND rate_per_kg_snapshot IS NOT NULL AND amount_mxn IS NOT NULL)",
             name="ck_harvest_entries_product_snapshot_consistency",
         ),
+        CheckConstraint(
+            "(worker_assignment_id IS NULL AND worker_slot_number_snapshot IS NULL "
+            "AND worker_barcode_snapshot IS NULL AND worker_name_snapshot IS NULL) OR "
+            "(worker_assignment_id IS NOT NULL AND worker_slot_number_snapshot IS NOT NULL "
+            "AND worker_barcode_snapshot IS NOT NULL AND worker_name_snapshot IS NOT NULL)",
+            name="ck_harvest_entries_worker_snapshot_consistency",
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -50,6 +57,16 @@ class HarvestEntry(db.Model):
     rate_per_kg_snapshot = db.Column(db.Numeric(8, 2), nullable=True)
     amount_mxn = db.Column(db.Numeric(12, 2), nullable=True)
 
+    worker_assignment_id = db.Column(
+        db.Integer,
+        db.ForeignKey("worker_assignments.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    worker_slot_number_snapshot = db.Column(db.Integer, nullable=True)
+    worker_barcode_snapshot = db.Column(db.String(100), nullable=True)
+    worker_name_snapshot = db.Column(db.String(150), nullable=True)
+
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
@@ -60,6 +77,7 @@ class HarvestEntry(db.Model):
 
     worker = db.relationship("Worker", backref="harvest_entries")
     product = db.relationship("Product")
+    assignment = db.relationship("WorkerAssignment")
 
     def __repr__(self):
         return f"<HarvestEntry {self.weight_kg}kg>"

@@ -8,6 +8,11 @@ from app.extensions import db
 from app.models.harvest_entry import HarvestEntry
 from app.models.product import Product
 from app.models.worker import Worker
+from app.models.worker_assignment import WorkerAssignment
+
+
+class WorkerUnassignedError(Exception):
+    """Raised when a worker has no open assignment."""
 
 
 def get_worker_by_barcode(barcode):
@@ -26,10 +31,28 @@ def _validate_product_id(product_id):
 def register_harvest(barcode, weight_kg, product_id):
     _validate_product_id(product_id)
 
-    worker = get_worker_by_barcode(barcode)
+    worker = (
+        db.session.query(Worker)
+        .filter(Worker.barcode == barcode, Worker.active.is_(True))
+        .with_for_update()
+        .one_or_none()
+    )
 
     if worker is None:
+        worker_inactive = Worker.query.filter_by(barcode=barcode).first()
+        if worker_inactive is not None:
+            return None, None
         return None, None
+
+    open_assignment = (
+        WorkerAssignment.query
+        .filter_by(worker_id=worker.id, ended_at=None)
+        .with_for_update()
+        .one_or_none()
+    )
+
+    if open_assignment is None:
+        raise WorkerUnassignedError("worker_unassigned")
 
     product = (
         Product.query
@@ -55,16 +78,20 @@ def register_harvest(barcode, weight_kg, product_id):
         product_name_snapshot=product.name,
         rate_per_kg_snapshot=rate_snapshot,
         amount_mxn=amount,
+        worker_assignment_id=open_assignment.id,
+        worker_slot_number_snapshot=worker.slot_number,
+        worker_barcode_snapshot=worker.barcode,
+        worker_name_snapshot=open_assignment.person_name,
     )
 
     db.session.add(entry)
     db.session.commit()
 
-    daily_total = get_daily_total(worker.id)
+    daily_total = get_daily_total(open_assignment.id)
     return entry, daily_total
 
 
-def get_daily_total(worker_id, operational_date=None, tz=None):
+def get_daily_total(assignment_id, operational_date=None, tz=None):
     if operational_date is None:
         if tz is None:
             from flask import current_app
@@ -80,7 +107,7 @@ def get_daily_total(worker_id, operational_date=None, tz=None):
     total = (
         db.session.query(func.coalesce(func.sum(HarvestEntry.weight_kg), 0))
         .filter(
-            HarvestEntry.worker_id == worker_id,
+            HarvestEntry.worker_assignment_id == assignment_id,
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
             HarvestEntry.voided == False,

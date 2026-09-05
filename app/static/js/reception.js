@@ -137,7 +137,7 @@ barcodeInput.addEventListener("keydown", async (event) => {
         if (response.status === 404) {
             productInfo.innerHTML = `
                 <div class="status-message status-message--error">
-                    <p><strong>Trabajador no encontrado.</strong></p>
+                    <p><strong>Cupo no encontrado.</strong></p>
                     <p>Código: ${escapeHtml(barcode)}</p>
                 </div>
             `;
@@ -151,6 +151,18 @@ barcodeInput.addEventListener("keydown", async (event) => {
         }
 
         const worker = await response.json();
+
+        if (!worker.has_assignment) {
+            productInfo.innerHTML = `
+                <div class="status-message status-message--error">
+                    <p><strong>${escapeHtml(worker.slot_label)} — Sin asignar</strong></p>
+                    <p>Código: ${escapeHtml(worker.barcode)}</p>
+                    <p>Este cupo no tiene una persona asignada. Contacte al administrador.</p>
+                </div>
+            `;
+            barcodeInput.select();
+            return;
+        }
 
         await showWorker(worker);
 
@@ -180,12 +192,13 @@ async function showWorker(worker) {
 
         productInfo.innerHTML = `
             <div class="worker-card">
-                <h2 class="worker-card__name">${escapeHtml(worker.name)}</h2>
+                <h2 class="worker-card__slot">${escapeHtml(daily.worker.slot_label)}</h2>
+                <h3 class="worker-card__name">${escapeHtml(daily.worker.name || "")}</h3>
 
                 <div class="worker-card__details">
                     <div class="worker-card__detail">
                         <span class="worker-card__label">Código</span>
-                        <span class="worker-card__value">${escapeHtml(worker.barcode)}</span>
+                        <span class="worker-card__value">${escapeHtml(daily.worker.barcode)}</span>
                     </div>
 
                     <div class="worker-card__detail worker-card__detail--full">
@@ -264,7 +277,7 @@ async function showWorker(worker) {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        barcode: worker.barcode,
+                        barcode: daily.worker.barcode,
                         weight_kg: weightKg,
                         product_id: selectedProductId
                     })
@@ -292,6 +305,17 @@ async function showWorker(worker) {
                         });
                         return;
                     }
+                    if (result.code === "worker_unassigned") {
+                        productInfo.innerHTML = `
+                            <div class="status-message status-message--error">
+                                <p><strong>${escapeHtml(daily.worker.slot_label)} — Sin asignar</strong></p>
+                                <p>Código: ${escapeHtml(daily.worker.barcode)}</p>
+                                <p>Este cupo no tiene una persona asignada. Contacte al administrador.</p>
+                            </div>
+                        `;
+                        barcodeInput.select();
+                        return;
+                    }
                     throw new Error(result.error || "No fue posible registrar la pesada");
                 }
 
@@ -309,7 +333,7 @@ async function showWorker(worker) {
                         </div>
                         <h2 class="success-card__title">Pesada registrada correctamente</h2>
                         <div class="success-card__details">
-                            <p><strong>Trabajador:</strong> ${escapeHtml(worker.name)}</p>
+                            <p><strong>Trabajador:</strong> ${escapeHtml(result.worker.slot_label)} — ${escapeHtml(result.worker.name)}</p>
                             <p><strong>Producto:</strong> ${escapeHtml(result.product_name)}</p>
                             <p><strong>Precio aplicado:</strong> $${escapeHtml(result.rate_per_kg)} MXN/kg</p>
                             <p><strong>Peso registrado:</strong> ${escapeHtml(result.weight_kg)} kg</p>

@@ -3,7 +3,7 @@ from io import BytesIO
 
 from flask import current_app
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
+from openpyxl.styles import Font, Alignment, numbers
 from openpyxl.utils import get_column_letter
 
 from app.extensions import db
@@ -15,7 +15,6 @@ _DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r", "\n")
 
 
 def _safe_text(value):
-    """Prepend an apostrophe to strings that Excel could interpret as formulas."""
     if not isinstance(value, str):
         return value
     if value and value[0] in _DANGEROUS_PREFIXES:
@@ -24,10 +23,6 @@ def _safe_text(value):
 
 
 def _to_local_naive(dt_utc, tz):
-    """Convert a UTC datetime to a timezone-aware local datetime, then strip tzinfo.
-
-    openpyxl does not support timezone-aware datetimes.
-    """
     if dt_utc is None:
         return None
     return dt_utc.astimezone(tz).replace(tzinfo=None)
@@ -53,10 +48,6 @@ def _auto_width(ws):
 
 
 def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
-    """Generate an Excel workbook with Movimientos and Resumen sheets.
-
-    Returns the workbook content as bytes.
-    """
     if tz is None:
         tz = current_app.config["HARVEST_TIMEZONE"]
 
@@ -70,10 +61,14 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
             HarvestEntry.voided,
             HarvestEntry.voided_at,
             HarvestEntry.void_reason,
-            Worker.name.label("worker_name"),
-            Worker.barcode.label("worker_barcode"),
+            HarvestEntry.worker_name_snapshot,
+            HarvestEntry.worker_barcode_snapshot,
+            HarvestEntry.worker_slot_number_snapshot,
+            HarvestEntry.worker_assignment_id,
+            HarvestEntry.product_name_snapshot,
+            HarvestEntry.rate_per_kg_snapshot,
+            HarvestEntry.amount_mxn,
         )
-        .join(Worker, HarvestEntry.worker_id == Worker.id)
         .filter(
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
@@ -85,8 +80,8 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
         pattern = f"%{query_filter}%"
         q = q.filter(
             db.or_(
-                Worker.name.ilike(pattern),
-                Worker.barcode.ilike(pattern),
+                HarvestEntry.worker_name_snapshot.ilike(pattern),
+                HarvestEntry.worker_barcode_snapshot.ilike(pattern),
             )
         )
 
@@ -94,13 +89,13 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
 
     wb = Workbook()
 
-    # --- Hoja Movimientos ---
     ws_mov = wb.active
     ws_mov.title = "Movimientos"
 
     mov_headers = [
-        "ID", "Fecha", "Hora", "Trabajador", "Código",
-        "Peso (kg)", "Estado", "Fecha y hora de anulación", "Motivo de anulación",
+        "ID", "Fecha", "Hora", "Trabajador", "Código", "Cupo",
+        "Peso (kg)", "Producto", "Precio/kg", "Importe",
+        "Estado", "Fecha y hora de anulación", "Motivo de anulación",
     ]
     _write_header_row(ws_mov, mov_headers)
 
@@ -116,38 +111,50 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
         time_cell = ws_mov.cell(row=row_idx, column=3, value=local_created.time() if local_created else None)
         time_cell.number_format = "HH:MM:SS"
 
-        ws_mov.cell(row=row_idx, column=4, value=_safe_text(entry.worker_name))
-        ws_mov.cell(row=row_idx, column=5, value=_safe_text(entry.worker_barcode))
+        ws_mov.cell(row=row_idx, column=4, value=_safe_text(entry.worker_name_snapshot))
+        ws_mov.cell(row=row_idx, column=5, value=_safe_text(entry.worker_barcode_snapshot))
 
-        weight_cell = ws_mov.cell(row=row_idx, column=6, value=Decimal(str(entry.weight_kg)))
+        slot_num = entry.worker_slot_number_snapshot
+        ws_mov.cell(row=row_idx, column=6, value=f"Trabajador {slot_num:03d}" if slot_num else None)
+
+        weight_cell = ws_mov.cell(row=row_idx, column=7, value=Decimal(str(entry.weight_kg)))
         weight_cell.number_format = "0.000"
 
-        ws_mov.cell(row=row_idx, column=7, value="Anulado" if entry.voided else "Vigente")
+        ws_mov.cell(row=row_idx, column=8, value=entry.product_name_snapshot)
+
+        rate_cell = ws_mov.cell(row=row_idx, column=9, value=entry.rate_per_kg_snapshot)
+        if rate_cell.value is not None:
+            rate_cell.number_format = "0.00"
+
+        amount_cell = ws_mov.cell(row=row_idx, column=10, value=entry.amount_mxn)
+        if amount_cell.value is not None:
+            amount_cell.number_format = "0.00"
+
+        ws_mov.cell(row=row_idx, column=11, value="Anulado" if entry.voided else "Vigente")
 
         if local_voided:
-            voided_cell = ws_mov.cell(row=row_idx, column=8, value=local_voided)
+            voided_cell = ws_mov.cell(row=row_idx, column=12, value=local_voided)
             voided_cell.number_format = "YYYY-MM-DD HH:MM:SS"
         else:
-            ws_mov.cell(row=row_idx, column=8, value=None)
+            ws_mov.cell(row=row_idx, column=12, value=None)
 
-        ws_mov.cell(row=row_idx, column=9, value=_safe_text(entry.void_reason) if entry.void_reason else None)
+        ws_mov.cell(row=row_idx, column=13, value=_safe_text(entry.void_reason) if entry.void_reason else None)
 
     ws_mov.freeze_panes = "A2"
-    ws_mov.auto_filter.ref = f"A1:I{len(entries) + 1}"
+    ws_mov.auto_filter.ref = f"A1:{get_column_letter(len(mov_headers))}{len(entries) + 1}"
     _auto_width(ws_mov)
 
-    # --- Hoja Resumen ---
     ws_res = wb.create_sheet(title="Resumen")
 
     res_headers = [
-        "Trabajador", "Código", "Movimientos vigentes",
+        "Trabajador", "Código", "Cupo", "Movimientos vigentes",
         "Peso vigente (kg)", "Movimientos anulados", "Peso anulado (kg)",
     ]
     _write_header_row(ws_res, res_headers)
 
     worker_summary = {}
     for entry in entries:
-        key = (entry.worker_name, entry.worker_barcode)
+        key = (entry.worker_assignment_id, entry.worker_name_snapshot, entry.worker_barcode_snapshot, entry.worker_slot_number_snapshot)
         if key not in worker_summary:
             worker_summary[key] = {
                 "vigentes_count": 0,
@@ -155,14 +162,14 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
                 "anulados_count": 0,
                 "anulados_weight": Decimal("0.000"),
             }
-        ws = worker_summary[key]
+        ws_data = worker_summary[key]
         w = Decimal(str(entry.weight_kg))
         if entry.voided:
-            ws["anulados_count"] += 1
-            ws["anulados_weight"] += w
+            ws_data["anulados_count"] += 1
+            ws_data["anulados_weight"] += w
         else:
-            ws["vigentes_count"] += 1
-            ws["vigentes_weight"] += w
+            ws_data["vigentes_count"] += 1
+            ws_data["vigentes_weight"] += w
 
     total_vig_count = 0
     total_vig_weight = Decimal("0.000")
@@ -171,17 +178,18 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
 
     worker_data_rows = 0
     row_idx = 2
-    for (name, barcode), data in sorted(worker_summary.items()):
+    for (assignment_id, name, barcode, slot_num), data in sorted(worker_summary.items()):
         ws_res.cell(row=row_idx, column=1, value=_safe_text(name))
         ws_res.cell(row=row_idx, column=2, value=_safe_text(barcode))
-        ws_res.cell(row=row_idx, column=3, value=data["vigentes_count"])
+        ws_res.cell(row=row_idx, column=3, value=f"Trabajador {slot_num:03d}" if slot_num else None)
+        ws_res.cell(row=row_idx, column=4, value=data["vigentes_count"])
 
-        vig_cell = ws_res.cell(row=row_idx, column=4, value=data["vigentes_weight"])
+        vig_cell = ws_res.cell(row=row_idx, column=5, value=data["vigentes_weight"])
         vig_cell.number_format = "0.000"
 
-        ws_res.cell(row=row_idx, column=5, value=data["anulados_count"])
+        ws_res.cell(row=row_idx, column=6, value=data["anulados_count"])
 
-        anul_cell = ws_res.cell(row=row_idx, column=6, value=data["anulados_weight"])
+        anul_cell = ws_res.cell(row=row_idx, column=7, value=data["anulados_weight"])
         anul_cell.number_format = "0.000"
 
         total_vig_count += data["vigentes_count"]
@@ -192,29 +200,62 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
         worker_data_rows += 1
         row_idx += 1
 
-    # Fila de totales
     total_font = Font(bold=True)
     ws_res.cell(row=row_idx, column=1, value="TOTALES").font = total_font
     ws_res.cell(row=row_idx, column=2).font = total_font
-    ws_res.cell(row=row_idx, column=3, value=total_vig_count).font = total_font
+    ws_res.cell(row=row_idx, column=3).font = total_font
+    ws_res.cell(row=row_idx, column=4, value=total_vig_count).font = total_font
 
-    tv_cell = ws_res.cell(row=row_idx, column=4, value=total_vig_weight)
+    tv_cell = ws_res.cell(row=row_idx, column=5, value=total_vig_weight)
     tv_cell.number_format = "0.000"
     tv_cell.font = total_font
 
-    ws_res.cell(row=row_idx, column=5, value=total_anul_count).font = total_font
+    ws_res.cell(row=row_idx, column=6, value=total_anul_count).font = total_font
 
-    ta_cell = ws_res.cell(row=row_idx, column=6, value=total_anul_weight)
+    ta_cell = ws_res.cell(row=row_idx, column=7, value=total_anul_weight)
     ta_cell.number_format = "0.000"
     ta_cell.font = total_font
 
-    # Autofilter covers header + worker rows only, excluding TOTALES
     res_last_row = 1 + worker_data_rows if worker_data_rows else 1
     ws_res.freeze_panes = "A2"
-    ws_res.auto_filter.ref = f"A1:F{res_last_row}"
+    ws_res.auto_filter.ref = f"A1:G{res_last_row}"
     _auto_width(ws_res)
 
-    # --- Guardar en memoria ---
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def generate_credentials_export():
+    from app.models.worker import Worker as WorkerModel
+    workers = WorkerModel.query.order_by(WorkerModel.slot_number.asc()).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Credenciales"
+
+    headers = ["Número", "Etiqueta", "Código", "Nombre asignado"]
+    header_font = Font(bold=True)
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    for row_idx, worker in enumerate(workers, 2):
+        ws.cell(row=row_idx, column=1, value=worker.slot_number)
+        ws.cell(row=row_idx, column=2, value=worker.slot_label)
+
+        barcode_cell = ws.cell(row=row_idx, column=3, value=_safe_text(worker.barcode))
+        barcode_cell.number_format = numbers.FORMAT_TEXT
+
+        name_cell = ws.cell(row=row_idx, column=4, value=_safe_text(worker.name) if worker.name else "")
+        name_cell.number_format = numbers.FORMAT_TEXT
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:D{len(workers) + 1}"
+    _auto_width(ws)
+
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)

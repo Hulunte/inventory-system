@@ -26,10 +26,6 @@ def _format_decimal(value):
 
 
 def date_range_to_utc(start_date, end_date, tz=None):
-    """Convert local date range to UTC boundaries [start_utc, end_utc).
-
-    The range is inclusive at the start and exclusive at the end of the next day.
-    """
     if tz is None:
         tz = _get_tz()
     start_utc = datetime.combine(start_date, time.min, tzinfo=tz).astimezone(timezone.utc)
@@ -38,10 +34,6 @@ def date_range_to_utc(start_date, end_date, tz=None):
 
 
 def get_week_ranges(reference_date):
-    """Return (current_week, previous_week) as ((monday, sunday), ...) for a given date.
-
-    Each week runs Monday–Sunday inclusive.
-    """
     monday_current = reference_date - timedelta(days=reference_date.weekday())
     sunday_current = monday_current + timedelta(days=6)
 
@@ -59,28 +51,33 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
 
     q = (
         db.session.query(
-            Worker.id,
-            Worker.name,
-            Worker.barcode,
+            HarvestEntry.worker_assignment_id,
+            HarvestEntry.worker_slot_number_snapshot,
+            HarvestEntry.worker_name_snapshot,
+            HarvestEntry.worker_barcode_snapshot,
             func.count(HarvestEntry.id).label("entries_count"),
             func.coalesce(func.sum(HarvestEntry.weight_kg), 0).label("total_weight_kg"),
         )
-        .join(HarvestEntry, Worker.id == HarvestEntry.worker_id)
         .filter(
             HarvestEntry.created_at >= start_utc,
             HarvestEntry.created_at < end_utc,
             HarvestEntry.voided == False,
         )
-        .group_by(Worker.id, Worker.name, Worker.barcode)
-        .order_by(Worker.name.asc())
+        .group_by(
+            HarvestEntry.worker_assignment_id,
+            HarvestEntry.worker_slot_number_snapshot,
+            HarvestEntry.worker_name_snapshot,
+            HarvestEntry.worker_barcode_snapshot,
+        )
+        .order_by(HarvestEntry.worker_slot_number_snapshot.asc().nullslast())
     )
 
     if query_filter:
         pattern = f"%{query_filter}%"
         q = q.filter(
             db.or_(
-                Worker.name.ilike(pattern),
-                Worker.barcode.ilike(pattern),
+                HarvestEntry.worker_name_snapshot.ilike(pattern),
+                HarvestEntry.worker_barcode_snapshot.ilike(pattern),
             )
         )
 
@@ -93,11 +90,17 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
     for r in rows:
         worker_weight = Decimal(str(r.total_weight_kg))
         worker_weight_formatted = _format_decimal(worker_weight)
+
+        slot_num = r.worker_slot_number_snapshot
+        slot_label = f"Trabajador {slot_num:03d}" if slot_num else None
+
         workers_data.append(
             {
-                "worker_id": r.id,
-                "name": r.name,
-                "barcode": r.barcode,
+                "worker_assignment_id": r.worker_assignment_id,
+                "slot_number": slot_num,
+                "slot_label": slot_label,
+                "name": r.worker_name_snapshot,
+                "barcode": r.worker_barcode_snapshot,
                 "entries_count": r.entries_count,
                 "total_weight_kg": worker_weight_formatted,
             }

@@ -2,16 +2,18 @@ import pytest
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from app.models.worker import Worker
 from app.models.harvest_entry import HarvestEntry
+from app.models.worker import Worker
+from tests.conftest import make_worker
 
 
 class TestLeakageTestA:
+    created_barcode = None
+
     def test_create_worker_and_entry(self, db_session, app):
         with app.app_context():
-            w = Worker(barcode="LEAK-A-001", name="Leakage Test Worker A")
-            db_session.add(w)
-            db_session.flush()
+            w = make_worker(db_session, name="Leakage Test Worker A")
+            TestLeakageTestA.created_barcode = w.barcode
 
             e = HarvestEntry(
                 worker_id=w.id,
@@ -25,10 +27,12 @@ class TestLeakageTestA:
 class TestLeakageTestB:
     def test_worker_from_A_should_not_exist(self, db_session, app):
         with app.app_context():
-            w = Worker.query.filter_by(barcode="LEAK-A-001").first()
-            assert w is None, "DATA LEAKAGE CONFIRMED: Worker 'LEAK-A-001' found."
+            barcode = TestLeakageTestA.created_barcode
+            w = Worker.query.filter_by(barcode=barcode).first()
+            assert w is None, f"DATA LEAKAGE CONFIRMED: Worker '{barcode}' found."
 
     def test_entry_from_A_should_not_exist(self, db_session, app):
         with app.app_context():
-            w = Worker.query.filter_by(barcode="LEAK-A-001").first()
+            barcode = TestLeakageTestA.created_barcode
+            w = Worker.query.filter_by(barcode=barcode).first()
             assert w is None
