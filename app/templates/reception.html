@@ -61,6 +61,21 @@
             </div>
         </div>
 
+        <section class="card recent-movements" id="recent-movements">
+            <div class="recent-movements__header">
+                <h2 class="recent-movements__title">Movimientos recientes</h2>
+                <button type="button" class="recent-movements__refresh" id="refresh-movements">
+                    Actualizar
+                </button>
+            </div>
+            <div id="movements-content" aria-live="polite">
+                <div class="status-message status-message--loading">
+                    <span class="spinner"></span>
+                    Cargando movimientos...
+                </div>
+            </div>
+        </section>
+
     </div>
 
     <script src="{{ url_for('static', filename='js/reception.js') }}"></script>

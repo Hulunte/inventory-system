@@ -1,12 +1,13 @@
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, make_response, request
 
 from app.exceptions import ProductUnavailableError
 from app.services.harvest_service import (
     WorkerUnassignedError,
     get_all_entries,
     get_daily_total,
+    get_recent_movements,
     get_worker_by_barcode,
     register_harvest,
 )
@@ -175,3 +176,38 @@ def list_entries():
             for entry in entries
         ]
     )
+
+
+@harvest_bp.get("/api/harvest/recent")
+def list_recent_movements():
+    limit_raw = request.args.get("limit", "10")
+
+    if isinstance(limit_raw, bool):
+        return jsonify({"error": "limit must be a positive integer"}), 400
+
+    if not isinstance(limit_raw, str):
+        return jsonify({"error": "limit must be a positive integer"}), 400
+
+    if limit_raw != limit_raw.strip():
+        return jsonify({"error": "limit must be a positive integer"}), 400
+
+    limit_raw = limit_raw.strip()
+
+    if not limit_raw:
+        return jsonify({"error": "limit must be a positive integer"}), 400
+
+    try:
+        limit = int(limit_raw)
+    except (ValueError, TypeError):
+        return jsonify({"error": "limit must be a positive integer"}), 400
+
+    if str(limit) != limit_raw:
+        return jsonify({"error": "limit must be a positive integer"}), 400
+
+    if limit < 1 or limit > 20:
+        return jsonify({"error": "limit must be between 1 and 20"}), 400
+
+    movements = get_recent_movements(limit=limit)
+    response = make_response(jsonify({"movements": movements}))
+    response.headers["Cache-Control"] = "no-store"
+    return response

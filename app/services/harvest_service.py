@@ -125,3 +125,59 @@ def get_all_entries():
         .order_by(HarvestEntry.created_at.desc())
         .all()
     )
+
+
+def get_recent_movements(limit=10):
+    from flask import current_app
+    tz = current_app.config["HARVEST_TIMEZONE"]
+
+    operational_date = datetime.now(tz).date()
+    start_utc, end_utc = _date_range_to_utc(operational_date, tz)
+
+    entries = (
+        HarvestEntry.query
+        .filter(
+            HarvestEntry.created_at >= start_utc,
+            HarvestEntry.created_at < end_utc,
+        )
+        .order_by(HarvestEntry.created_at.desc(), HarvestEntry.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    movements = []
+    for entry in entries:
+        local_time = entry.created_at.astimezone(tz).strftime("%H:%M:%S")
+        slot_num = entry.worker_slot_number_snapshot
+        movements.append({
+            "id": entry.id,
+            "time": local_time,
+            "worker": {
+                "name": entry.worker_name_snapshot,
+                "barcode": entry.worker_barcode_snapshot,
+                "slot_number": slot_num,
+                "slot_label": f"Trabajador {slot_num:03d}" if slot_num is not None else None,
+            },
+            "worker_assignment_id": entry.worker_assignment_id,
+            "product_name": entry.product_name_snapshot,
+            "weight_kg": str(entry.weight_kg),
+            "rate_per_kg": (
+                str(entry.rate_per_kg_snapshot.quantize(Decimal("0.01")))
+                if entry.rate_per_kg_snapshot is not None
+                else None
+            ),
+            "amount_mxn": (
+                str(entry.amount_mxn.quantize(Decimal("0.01")))
+                if entry.amount_mxn is not None
+                else None
+            ),
+            "voided": entry.voided,
+        })
+
+    return movements
+
+
+def _date_range_to_utc(start_date, tz):
+    start_utc = datetime.combine(start_date, time.min, tzinfo=tz).astimezone(timezone.utc)
+    end_utc = datetime.combine(start_date + timedelta(days=1), time.min, tzinfo=tz).astimezone(timezone.utc)
+    return start_utc, end_utc
