@@ -2,6 +2,8 @@ const barcodeInput = document.getElementById("barcode");
 const productInfo = document.getElementById("product-info");
 const productButtonsContainer = document.getElementById("product-buttons");
 const productWarning = document.getElementById("product-warning");
+const movementsContent = document.getElementById("movements-content");
+const refreshMovementsBtn = document.getElementById("refresh-movements");
 
 const STORAGE_KEY = "inventory.selectedProductId";
 let selectedProductId = null;
@@ -347,6 +349,8 @@ async function showWorker(worker) {
                 barcodeInput.value = "";
                 barcodeInput.focus();
 
+                loadRecentMovements();
+
             } catch (error) {
                 console.error(error);
 
@@ -372,3 +376,110 @@ async function showWorker(worker) {
         `;
     }
 }
+
+
+// --- Recent Movements ---
+
+let isLoadingMovements = false;
+let movementsPollInterval = null;
+
+async function loadRecentMovements() {
+    if (isLoadingMovements) {
+        return;
+    }
+
+    isLoadingMovements = true;
+    refreshMovementsBtn.disabled = true;
+
+    try {
+        const response = await fetch("/api/harvest/recent?limit=10");
+
+        if (!response.ok) {
+            throw new Error("Error loading movements");
+        }
+
+        const data = await response.json();
+        const movements = data.movements;
+
+        if (movements.length === 0) {
+            movementsContent.innerHTML = `
+                <div class="status-message status-message--idle">
+                    No hay movimientos registrados hoy.
+                </div>
+            `;
+            return;
+        }
+
+        let html = '<div class="movements-list">';
+        for (const m of movements) {
+            const statusClass = m.voided ? "movement--voided" : "movement--active";
+            const statusLabel = m.voided ? "Anulado" : "Vigente";
+            const productName = m.product_name ? escapeHtml(m.product_name) : "Sin producto";
+            const rateDisplay = m.rate_per_kg ? `$${escapeHtml(m.rate_per_kg)}` : "\u2014";
+            const amountDisplay = m.amount_mxn ? `$${escapeHtml(m.amount_mxn)} MXN` : "\u2014";
+
+            const slotLabel = m.worker.slot_label
+                ? `${escapeHtml(m.worker.slot_label)} — `
+                : "";
+
+            html += `
+                <div class="movement ${statusClass}">
+                    <div class="movement__row">
+                        <span class="movement__time">${escapeHtml(m.time)}</span>
+                        <span class="movement__worker">${slotLabel}${escapeHtml(m.worker.name || "")} (${escapeHtml(m.worker.barcode || "")})</span>
+                        <span class="movement__badge movement__badge--${m.voided ? "voided" : "active"}">${escapeHtml(statusLabel)}</span>
+                    </div>
+                    <div class="movement__row movement__details">
+                        <span class="movement__product">${productName}</span>
+                        <span class="movement__weight">${escapeHtml(m.weight_kg)} kg</span>
+                        <span class="movement__rate">${rateDisplay}/kg</span>
+                        <span class="movement__amount">${amountDisplay}</span>
+                    </div>
+                </div>
+            `;
+        }
+        html += '</div>';
+        movementsContent.innerHTML = html;
+    } catch (error) {
+        console.error(error);
+
+        if (!movementsContent.querySelector('.movements-list')) {
+            movementsContent.innerHTML = `
+                <div class="status-message status-message--error">
+                    No fue posible cargar los movimientos.
+                </div>
+            `;
+        }
+    } finally {
+        isLoadingMovements = false;
+        refreshMovementsBtn.disabled = false;
+    }
+}
+
+function startMovementsPolling() {
+    stopMovementsPolling();
+    movementsPollInterval = setInterval(loadRecentMovements, 15000);
+}
+
+function stopMovementsPolling() {
+    if (movementsPollInterval !== null) {
+        clearInterval(movementsPollInterval);
+        movementsPollInterval = null;
+    }
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        stopMovementsPolling();
+    } else {
+        loadRecentMovements();
+        startMovementsPolling();
+    }
+});
+
+refreshMovementsBtn.addEventListener("click", () => {
+    loadRecentMovements();
+});
+
+loadRecentMovements();
+startMovementsPolling();
