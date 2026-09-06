@@ -1,0 +1,649 @@
+/* ============================================================
+   Brand Identity - Agricola Vita Santa Fe
+   Global visual refresh
+   ============================================================ */
+
+/* ---------- Palette ---------- */
+
+:root {
+    --brand-green: #147a38;
+    --brand-green-dark: #0d5f2b;
+    --brand-lime: #86c52a;
+    --brand-cream: #fff8c7;
+    --brand-soft-green: #eef8ef;
+    --brand-white: #ffffff;
+    --brand-text: #183321;
+    --brand-border: #b7d8bd;
+
+    /* Override page palette with brand colors */
+    --clr-bg: #eef8ef;
+    --clr-surface: #ffffff;
+    --clr-text: #183321;
+    --clr-text-muted: #4a6e52;
+    --clr-border: #b7d8bd;
+    --clr-primary: #147a38;
+    --clr-primary-hover: #0d5f2b;
+    --clr-primary-light: #eef8ef;
+    --clr-success: #147a38;
+    --clr-success-bg: #eef8ef;
+    --clr-success-border: #b7d8bd;
+    --clr-error: #c0392b;
+    --clr-error-bg: #fdf2f2;
+    --clr-error-border: #f5c6cb;
+    --clr-warning: #b8860b;
+    --clr-warning-bg: #fff8c7;
+    --clr-warning-border: #f0e68c;
+    --clr-row-hover: #f5faf5;
+    --clr-row-selected: #eef8ef;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(20, 122, 56, 0.08), 0 4px 12px rgba(20, 122, 56, 0.04);
+    --shadow-lg: 0 4px 24px rgba(20, 122, 56, 0.1);
+    --transition: 0.2s ease;
+}
+
+/* ---------- Base overrides ---------- */
+
+body {
+    background-color: var(--clr-bg) !important;
+    color: var(--clr-text) !important;
+}
+
+a {
+    color: var(--clr-primary);
+}
+
+a:hover {
+    color: var(--clr-primary-hover);
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+    outline: 2px solid var(--brand-lime);
+    outline-offset: 2px;
+}
+
+/* ---------- Logo ---------- */
+
+.brand-logo {
+    display: block;
+    height: 80px;
+    width: auto;
+    max-width: 280px;
+    object-fit: contain;
+}
+
+.brand-logo--compact {
+    height: 64px;
+    max-width: 220px;
+}
+
+@media (max-width: 768px) {
+    .brand-logo {
+        height: 64px;
+        max-width: 220px;
+    }
+
+    .brand-logo--compact {
+        height: 52px;
+        max-width: 180px;
+    }
+}
+
+@media (max-width: 480px) {
+    .brand-logo {
+        height: 52px;
+        max-width: 180px;
+    }
+
+    .brand-logo--compact {
+        height: 48px;
+        max-width: 160px;
+    }
+}
+
+/* ---------- Brand header ---------- */
+
+.brand-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.brand-header .brand-logo {
+    flex-shrink: 0;
+}
+
+/* ---------- Institutional header ---------- */
+
+.reception-header,
+.admin-header,
+.history-header,
+.reports-header,
+.tickets-header {
+    background: var(--brand-green-dark);
+    color: var(--brand-white);
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius);
+    margin-bottom: 0;
+}
+
+/* Reception header: two-column layout */
+.reception-header {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    gap: 1rem;
+    align-items: center;
+}
+
+.reception-header__logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+}
+
+.brand-logo--header {
+    width: 150px;
+    height: auto;
+    max-height: 140px;
+    object-fit: contain;
+}
+
+.reception-header__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+@media (max-width: 600px) {
+    .reception-header {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+    }
+
+    .reception-header__logo {
+        padding: 0.5rem 0 0.25rem;
+    }
+
+    .brand-logo--header {
+        width: 110px;
+        max-height: 110px;
+    }
+
+    .reception-header__content {
+        align-items: center;
+    }
+
+    .reception-header__nav {
+        justify-content: center;
+    }
+}
+
+.reception-header__title,
+.admin-header__title,
+.history-header__title,
+.reports-header__title,
+.tickets-header__title {
+    color: var(--brand-white) !important;
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+/* ---------- Navigation ---------- */
+
+.reception-header__nav,
+.admin-header__nav,
+.history-header__nav,
+.reports-header__nav,
+.tickets-header__nav {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.reception-header__link,
+.admin-header__link,
+.history-header__link,
+.reports-header__link,
+.tickets-header__link {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--brand-white);
+    text-decoration: none;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: var(--radius-sm);
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.reception-header__link:hover,
+.admin-header__link:hover,
+.history-header__link:hover,
+.reports-header__link:hover,
+.tickets-header__link:hover {
+    background: var(--brand-lime);
+    color: var(--brand-green-dark);
+    border-color: var(--brand-lime);
+}
+
+.reception-header__link--active,
+.admin-header__link--active,
+.history-header__link--active,
+.reports-header__link--active,
+.tickets-header__link--active,
+.tickets-header__link--active {
+    background: var(--brand-lime);
+    color: var(--brand-green-dark);
+    border-color: var(--brand-lime);
+    font-weight: 700;
+}
+
+.reception-header__subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.85rem;
+}
+
+/* ---------- Buttons ---------- */
+
+.form__button,
+.btn--primary {
+    background: var(--brand-green) !important;
+    color: var(--brand-white) !important;
+    border: none !important;
+}
+
+.form__button:hover,
+.btn--primary:hover {
+    background: var(--brand-green-dark) !important;
+}
+
+.form__button:active {
+    transform: scale(0.985);
+}
+
+.form__button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.form__button--secondary {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green-dark) !important;
+    border: 1px solid var(--brand-border) !important;
+}
+
+.form__button--secondary:hover {
+    background: var(--brand-border) !important;
+}
+
+.form__button--danger {
+    background: var(--clr-error) !important;
+    color: var(--brand-white) !important;
+}
+
+.form__button--danger:hover {
+    background: #a93226 !important;
+}
+
+.form__button--warning {
+    background: var(--brand-cream) !important;
+    color: var(--brand-text) !important;
+    border: 1px solid #e6d87a !important;
+}
+
+.form__button--warning:hover {
+    background: #f5efa0 !important;
+}
+
+.form__button--export {
+    background: var(--brand-green) !important;
+    color: var(--brand-white) !important;
+}
+
+.form__button--export:hover {
+    background: var(--brand-green-dark) !important;
+}
+
+.form__button--send {
+    background: var(--brand-green) !important;
+    color: var(--brand-white) !important;
+}
+
+.form__button--send:hover {
+    background: var(--brand-green-dark) !important;
+}
+
+/* Admin buttons */
+
+.btn {
+    background: var(--brand-green);
+    color: var(--brand-white);
+    border: none;
+}
+
+.btn:hover {
+    background: var(--brand-green-dark);
+    opacity: 1;
+}
+
+.btn--danger {
+    background: var(--clr-error) !important;
+}
+
+.btn--danger:hover {
+    background: #a93226 !important;
+}
+
+.btn--success {
+    background: var(--brand-green) !important;
+}
+
+.btn--cancel {
+    background: var(--clr-border) !important;
+    color: var(--clr-text) !important;
+}
+
+.btn--logout {
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    color: var(--brand-white) !important;
+    background: transparent !important;
+}
+
+.btn--logout:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: var(--brand-white) !important;
+}
+
+/* ---------- Cards ---------- */
+
+.card {
+    background: var(--brand-white);
+    border: 1px solid var(--brand-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+/* ---------- Scanner input ---------- */
+
+.scanner-zone__input:focus {
+    border-color: var(--brand-green) !important;
+    box-shadow: 0 0 0 3px rgba(20, 122, 56, 0.15) !important;
+}
+
+.scanner-zone__icon {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green) !important;
+}
+
+/* ---------- Form inputs ---------- */
+
+.form__input:focus,
+.search-zone__input:focus {
+    border-color: var(--brand-green) !important;
+    box-shadow: 0 0 0 3px rgba(20, 122, 56, 0.15) !important;
+}
+
+/* ---------- Status messages ---------- */
+
+.status-message--loading {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green) !important;
+    border-color: var(--brand-border) !important;
+}
+
+.spinner {
+    border-color: rgba(20, 122, 56, 0.25) !important;
+    border-top-color: var(--brand-green) !important;
+}
+
+/* ---------- Worker row highlights ---------- */
+
+.worker-row__slot {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green-dark) !important;
+}
+
+.worker-row__rate {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green) !important;
+}
+
+.worker-row:hover {
+    border-color: var(--brand-green) !important;
+}
+
+.entry-row:hover {
+    border-color: var(--brand-green) !important;
+}
+
+/* ---------- Product buttons ---------- */
+
+.product-btn:hover {
+    border-color: var(--brand-green) !important;
+    background: var(--brand-soft-green) !important;
+}
+
+.product-btn--selected {
+    border-color: var(--brand-green) !important;
+    background: var(--brand-green) !important;
+    color: var(--brand-white) !important;
+}
+
+.product-btn--selected:hover {
+    background: var(--brand-green-dark) !important;
+    border-color: var(--brand-green-dark) !important;
+}
+
+/* ---------- Stock display ---------- */
+
+.stock-display__number {
+    color: var(--brand-green) !important;
+}
+
+/* ---------- Success card ---------- */
+
+.success-card__icon {
+    background: var(--brand-soft-green) !important;
+    border-color: var(--brand-border) !important;
+    color: var(--brand-green) !important;
+}
+
+.success-card__title {
+    color: var(--brand-green) !important;
+}
+
+/* ---------- Scale section ---------- */
+
+.scale-section {
+    border-left: 4px solid var(--brand-green) !important;
+}
+
+.scale-section__status--connected {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green) !important;
+}
+
+.scale-btn--primary {
+    background: var(--brand-green) !important;
+    color: var(--brand-white) !important;
+    border-color: var(--brand-green) !important;
+}
+
+.scale-btn--primary:hover {
+    background: var(--brand-green-dark) !important;
+}
+
+.scale-btn--success {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green) !important;
+    border-color: var(--brand-border) !important;
+}
+
+.scale-btn--success:hover {
+    background: var(--brand-green) !important;
+    color: var(--brand-white) !important;
+}
+
+/* ---------- Movement badges ---------- */
+
+.movement--active {
+    border-left: 3px solid var(--brand-green) !important;
+}
+
+.movement__badge--active {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green) !important;
+    border-color: var(--brand-border) !important;
+}
+
+/* ---------- Backup ---------- */
+
+.backup-latest {
+    border-color: var(--brand-border) !important;
+    background: var(--brand-soft-green) !important;
+}
+
+.backup-latest__title {
+    color: var(--brand-green) !important;
+}
+
+/* ---------- Filters ---------- */
+
+.filters__button {
+    background: var(--brand-green) !important;
+    color: var(--brand-white) !important;
+    border: none !important;
+}
+
+.filters__button:hover {
+    background: var(--brand-green-dark) !important;
+}
+
+.filters__button--secondary {
+    background: var(--brand-soft-green) !important;
+    color: var(--brand-green-dark) !important;
+    border: 1px solid var(--brand-border) !important;
+}
+
+.filters__button--secondary:hover {
+    background: var(--brand-border) !important;
+}
+
+.filters__button--export {
+    background: var(--brand-green) !important;
+}
+
+.filters__button--send {
+    background: var(--brand-green) !important;
+}
+
+/* ---------- Stats bar ---------- */
+
+.stats-bar {
+    color: var(--brand-text);
+}
+
+/* ---------- Empty state ---------- */
+
+.empty-state {
+    color: var(--clr-text-muted);
+}
+
+/* ---------- Login page ---------- */
+
+.login-header {
+    text-align: center;
+}
+
+.login-header__title {
+    color: var(--brand-green-dark) !important;
+}
+
+.login-card {
+    border-color: var(--brand-border) !important;
+}
+
+.login-wrapper {
+    background: var(--brand-soft-green);
+    border-radius: var(--radius);
+    padding: 2rem;
+    border: 1px solid var(--brand-border);
+}
+
+/* ---------- Splash Screen ---------- */
+
+.app-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, var(--brand-green-dark) 0%, var(--brand-green) 50%, var(--brand-lime) 100%);
+    opacity: 1;
+    transition: opacity 0.4s ease;
+}
+
+.app-splash--hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.app-splash__logo {
+    width: 300px;
+    max-width: 80vw;
+    height: auto;
+    object-fit: contain;
+    margin-bottom: 1.5rem;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+}
+
+.app-splash__text {
+    color: var(--brand-white);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, sans-serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-align: center;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+    .app-splash__logo {
+        width: 240px;
+    }
+
+    .app-splash__text {
+        font-size: 1.4rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-splash__logo {
+        width: 200px;
+    }
+
+    .app-splash__text {
+        font-size: 1.2rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-splash {
+        transition: none;
+    }
+}
+
+/* ---------- Print styles ---------- */
+
+@media print {
+    .app-splash {
+        display: none !important;
+    }
+}

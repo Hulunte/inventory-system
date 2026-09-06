@@ -1,6 +1,4 @@
 """Tests for scale service (mocked serial)."""
-import threading
-import time
 from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
@@ -16,6 +14,15 @@ from app.services.scale_service import (
     is_available,
     list_ports,
     reset_scale_service,
+    get_scale_service,
+    STATUS_CONNECTED,
+    STATUS_NO_SERIAL_PORTS,
+    STATUS_SCALE_NOT_CONNECTED,
+    STATUS_PORT_IN_USE,
+    STATUS_INVALID_CONFIGURATION,
+    STATUS_SERIAL_READ_ERROR,
+    STATUS_PYSERIAL_UNAVAILABLE,
+    STATUS_UNSUPPORTED_PLATFORM,
 )
 
 
@@ -62,6 +69,114 @@ class TestListPorts:
     def test_returns_list(self):
         result = list_ports()
         assert isinstance(result, list)
+
+
+class TestStatusPyserialUnavailable:
+    @patch("app.services.scale_service.HAS_PYSERIAL", False)
+    def test_status_code_pyserial_unavailable(self):
+        svc = ScaleService()
+        status = svc.get_status()
+        assert status["pyserial_available"] is False
+        assert status["code"] == STATUS_PYSERIAL_UNAVAILABLE
+        assert "instalado" in status["message"].lower()
+
+    @patch("app.services.scale_service.HAS_PYSERIAL", False)
+    def test_connect_raises_with_code(self):
+        svc = ScaleService()
+        with pytest.raises(ScaleUnavailableError):
+            svc.connect(_make_config())
+        status = svc.get_status()
+        assert status["code"] == STATUS_PYSERIAL_UNAVAILABLE
+
+
+class TestStatusNoSerialPorts:
+    @patch("app.services.scale_service.HAS_PYSERIAL", True)
+    @patch("app.services.scale_service.list_ports", return_value=[])
+    def test_code_no_serial_ports(self, mock_lp):
+        svc = ScaleService()
+        status = svc.get_status()
+        assert status["pyserial_available"] is True
+        assert status["ports_available"] is False
+        assert status["code"] == STATUS_NO_SERIAL_PORTS
+        assert "puertos" in status["message"].lower()
+
+    @patch("app.services.scale_service.HAS_PYSERIAL", True)
+    @patch("app.services.scale_service.list_ports", return_value=[])
+    def test_not_pyserial_unavailable_when_empty(self, mock_lp):
+        svc = ScaleService()
+        status = svc.get_status()
+        assert status["code"] != STATUS_PYSERIAL_UNAVAILABLE
+
+
+class TestStatusPortsAvailable:
+    @patch("app.services.scale_service.HAS_PYSERIAL", True)
+    @patch("app.services.scale_service.list_ports", return_value=[{"device": "COM7", "name": "COM7", "description": "USB Serial"}])
+    def test_code_scale_not_connected(self, mock_lp):
+        svc = ScaleService()
+        status = svc.get_status()
+        assert status["ports_available"] is True
+        assert status["code"] == STATUS_SCALE_NOT_CONNECTED
+        assert "conectado" not in status["message"].lower() or "no se ha" in status["message"].lower()
+
+
+class TestStatusConnected:
+    @patch("app.services.scale_service.HAS_PYSERIAL", True)
+    @patch("app.services.scale_service.serial")
+    def test_code_connected(self, mock_serial_module):
+        mock_serial = _make_mock_serial()
+        mock_serial_module.Serial.return_value = mock_serial
+        mock_serial_module.SerialException = Exception
+
+        svc = ScaleService()
+        svc.connect(_make_config("COM3"))
+        status = svc.get_status()
+        assert status["connected"] is True
+        assert status["code"] == STATUS_CONNECTED
+        assert "conectada" in status["message"].lower()
+
+        svc.stop()
+
+
+class TestStatusPortInUse:
+    @patch("app.services.scale_service.HAS_PYSERIAL", True)
+    @patch("app.services.scale_service.serial")
+    def test_code_port_in_use_on_serial_exception(self, mock_serial_module):
+        mock_serial_module.Serial.side_effect = Exception("Permission denied")
+        mock_serial_module.SerialException = Exception
+
+        svc = ScaleService()
+        with pytest.raises(ScaleConnectionError):
+            svc.connect(_make_config("COM3"))
+        status = svc.get_status()
+        assert status["code"] == STATUS_PORT_IN_USE
+
+
+class TestStatusFields:
+    @patch("app.services.scale_service.HAS_PYSERIAL", True)
+    @patch("app.services.scale_service.list_ports", return_value=[])
+    def test_all_required_fields(self, mock_lp):
+        svc = ScaleService()
+        status = svc.get_status()
+        assert "pyserial_available" in status
+        assert "ports_available" in status
+        assert "connected" in status
+        assert "code" in status
+        assert "message" in status
+        assert "port" in status
+        assert "connected_at" in status
+        assert "last_reading" in status
+        assert "diagnostic_mode" in status
+        assert "error" in status
+        assert "reconnect_attempts" in status
+
+    def test_status_types(self):
+        svc = ScaleService()
+        status = svc.get_status()
+        assert isinstance(status["pyserial_available"], bool)
+        assert isinstance(status["ports_available"], bool)
+        assert isinstance(status["connected"], bool)
+        assert isinstance(status["code"], str)
+        assert isinstance(status["message"], str)
 
 
 class TestScaleServiceConnect:
@@ -127,30 +242,6 @@ class TestScaleServiceDisconnect:
         assert not svc.connected
 
 
-class TestScaleServiceStatus:
-    def test_status_when_disconnected(self):
-        svc = ScaleService()
-        status = svc.get_status()
-        assert status["connected"] is False
-        assert status["port"] == ""
-        assert status["last_reading"] is None
-
-    @patch("app.services.scale_service.HAS_PYSERIAL", True)
-    @patch("app.services.scale_service.serial")
-    def test_status_when_connected(self, mock_serial_module):
-        mock_serial = _make_mock_serial()
-        mock_serial_module.Serial.return_value = mock_serial
-        mock_serial_module.SerialException = Exception
-
-        svc = ScaleService()
-        svc.connect(_make_config("COM3"))
-        status = svc.get_status()
-        assert status["connected"] is True
-        assert status["port"] == "COM3"
-
-        svc.stop()
-
-
 class TestScaleServiceDiagnostic:
     def test_toggle_diagnostic(self):
         svc = ScaleService()
@@ -204,3 +295,16 @@ class TestScaleServiceStop:
         svc.connect(_make_config())
         svc.stop()
         assert not svc.connected
+
+
+class TestScaleServiceSingleton:
+    def test_get_returns_same_instance(self):
+        s1 = get_scale_service()
+        s2 = get_scale_service()
+        assert s1 is s2
+
+    def test_reset_creates_new(self):
+        s1 = get_scale_service()
+        reset_scale_service()
+        s2 = get_scale_service()
+        assert s1 is not s2

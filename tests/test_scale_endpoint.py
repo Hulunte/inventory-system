@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.services.scale_service import reset_scale_service
+from app.services.scale_service import reset_scale_service, STATUS_PYSERIAL_UNAVAILABLE
 
 
 @pytest.fixture(autouse=True)
@@ -26,8 +26,12 @@ class TestScalePortsEndpoint:
         data = resp.get_json()
         assert "ports" in data
         assert "available" in data
+        assert "code" in data
+        assert "message" in data
         assert isinstance(data["ports"], list)
         assert isinstance(data["available"], bool)
+        assert isinstance(data["code"], str)
+        assert isinstance(data["message"], str)
 
 
 class TestScaleStatusEndpoint:
@@ -39,14 +43,41 @@ class TestScaleStatusEndpoint:
         resp = admin_client.get("/api/scale/status")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert "available" in data
+        assert "pyserial_available" in data
+        assert "ports_available" in data
         assert "connected" in data
+        assert "code" in data
+        assert "message" in data
         assert "port" in data
         assert "connected_at" in data
         assert "last_reading" in data
         assert "diagnostic_mode" in data
         assert "error" in data
         assert "reconnect_attempts" in data
+
+    def test_status_has_valid_code(self, admin_client):
+        resp = admin_client.get("/api/scale/status")
+        data = resp.get_json()
+        valid_codes = {
+            "connected", "no_serial_ports", "scale_not_connected",
+            "port_in_use", "invalid_configuration", "serial_read_error",
+            "pyserial_unavailable", "unsupported_platform",
+        }
+        assert data["code"] in valid_codes
+
+    def test_status_message_matches_code(self, admin_client):
+        resp = admin_client.get("/api/scale/status")
+        data = resp.get_json()
+        code = data["code"]
+        msg = data["message"]
+        if code == "pyserial_unavailable":
+            assert "instalado" in msg.lower()
+        elif code == "no_serial_ports":
+            assert "puertos" in msg.lower()
+        elif code == "connected":
+            assert "conectada" in msg.lower()
+        elif code == "scale_not_connected":
+            assert "puertos" in msg.lower() or "bascula" in msg.lower()
 
 
 class TestScaleConnectEndpoint:
@@ -116,6 +147,8 @@ class TestScaleConnectEndpoint:
             headers={"X-CSRF-Token": csrf},
         )
         assert resp.status_code == 503
+        data = resp.get_json()
+        assert data.get("code") == "pyserial_unavailable"
 
 
 class TestScaleDisconnectEndpoint:

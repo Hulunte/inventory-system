@@ -143,3 +143,73 @@ class TestReceptionPageHasScaleScript:
         resp = admin_client.get("/")
         html = resp.data.decode()
         assert "reception.js" in html
+
+
+class TestScaleJsMessages:
+    def test_js_has_message_map(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "MESSAGES" in js
+
+    def test_pyserial_unavailable_message(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "pyserial_unavailable" in js
+        assert "reinstalar" in js.lower()
+
+    def test_no_serial_ports_message(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "no_serial_ports" in js
+        assert "Conecte la bascula" in js or "conecte" in js.lower()
+
+    def test_scale_not_connected_message(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "scale_not_connected" in js
+        assert "no se ha conectado" in js.lower()
+
+    def test_port_in_use_message(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "port_in_use" in js
+        assert "otra aplicacion" in js.lower() or "utilizada" in js.lower()
+
+    def test_connected_message(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "connected" in js
+        assert "conectada" in js.lower()
+
+    def test_serial_read_error_message(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "serial_read_error" in js
+        assert "no se reconoce" in js.lower() or "formato" in js.lower()
+
+    def test_invalid_configuration_message(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "invalid_configuration" in js
+
+    def test_messageForCode_function(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "messageForCode" in js
+
+    def test_load_ports_uses_code(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "data.code" in js or "code" in js
+
+    def test_updateUiFromStatus_uses_code(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert "updateUiFromStatus" in js
+        assert "status.code" in js or "code" in js
+
+    def test_no_pyserial_unavailable_shown_as_default(self, client):
+        resp = client.get("/static/js/scale.js")
+        js = resp.data.decode()
+        assert '"pyserial no disponible"' not in js
+        assert '"PySerial no disponible"' not in js

@@ -27,4 +27,4 @@ tzdata==2026.3
 Werkzeug==3.1.8
 waitress==3.0.2
 pywin32; sys_platform == "win32"
-pyserial; sys_platform == "win32"
+pyserial>=3.5
