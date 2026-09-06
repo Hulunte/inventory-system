@@ -41,6 +41,17 @@ class Config:
     TICKET_ENCODING = os.getenv("TICKET_ENCODING", "cp850")
     TICKET_AUTO_CUT = os.getenv("TICKET_AUTO_CUT", "true").lower() == "true"
 
+    SCALE_PORT = os.getenv("SCALE_PORT", "")
+    SCALE_BAUDRATE = int(os.getenv("SCALE_BAUDRATE", "9600"))
+    SCALE_BYTESIZE = int(os.getenv("SCALE_BYTESIZE", "8"))
+    SCALE_PARITY = os.getenv("SCALE_PARITY", "N")
+    SCALE_STOPBITS = float(os.getenv("SCALE_STOPBITS", "1"))
+    SCALE_TIMEOUT_SECONDS = float(os.getenv("SCALE_TIMEOUT_SECONDS", "1.0"))
+    SCALE_LINE_ENCODING = os.getenv("SCALE_LINE_ENCODING", "ascii")
+    SCALE_PROFILE = os.getenv("SCALE_PROFILE", "auto")
+    SCALE_MIN_WEIGHT_KG = os.getenv("SCALE_MIN_WEIGHT_KG", "0.001")
+    SCALE_MAX_WEIGHT_KG = os.getenv("SCALE_MAX_WEIGHT_KG", "999.999")
+
     @staticmethod
     def _validate_ticket_config(app):
         paper_width = app.config.get("TICKET_PAPER_WIDTH_MM", 80)

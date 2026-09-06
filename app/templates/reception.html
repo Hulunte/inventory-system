@@ -56,6 +56,50 @@
                 placeholder="Escanee o escriba un c&oacute;digo" autocomplete="off" autofocus>
         </section>
 
+        <section class="card scale-section" id="scale-section">
+            <div class="scale-section__header">
+                <h2 class="scale-section__title">Bascula</h2>
+                <span class="scale-section__status" id="scale-connection-status">Desconectada</span>
+            </div>
+
+            <div class="scale-section__controls">
+                <div class="scale-section__row">
+                    <label class="scale-label" for="scale-port-select">Puerto</label>
+                    <select class="scale-select" id="scale-port-select">
+                        <option value="">Sin puertos</option>
+                    </select>
+                    <button type="button" class="scale-btn scale-btn--sm" id="scale-refresh-ports">
+                        Actualizar
+                    </button>
+                </div>
+
+                <div class="scale-section__row">
+                    <button type="button" class="scale-btn scale-btn--primary" id="scale-connect-btn">
+                        Conectar
+                    </button>
+                    <button type="button" class="scale-btn scale-btn--danger" id="scale-disconnect-btn" hidden>
+                        Desconectar
+                    </button>
+                </div>
+            </div>
+
+            <div class="scale-section__reading" id="scale-reading-area" hidden>
+                <div class="scale-reading__weight">
+                    <span class="scale-reading__value" id="scale-weight-value">---</span>
+                    <span class="scale-reading__unit">kg</span>
+                </div>
+                <div class="scale-reading__meta">
+                    <span class="scale-reading__stability" id="scale-stability-indicator">Inestable</span>
+                    <span class="scale-reading__error" id="scale-reading-error" hidden></span>
+                </div>
+                <div class="scale-reading__actions">
+                    <button type="button" class="scale-btn scale-btn--success" id="scale-use-weight-btn" disabled>
+                        Usar peso de bascula
+                    </button>
+                </div>
+            </div>
+        </section>
+
         <div id="product-info" class="card">
             <div class="status-message status-message--idle">
                 Esperando trabajador...
@@ -80,6 +124,7 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/reception.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/scale.js') }}"></script>
 </body>
 
 </html>
