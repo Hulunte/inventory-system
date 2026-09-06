@@ -1,4 +1,5 @@
 import secrets
+import sys
 from functools import wraps
 
 from flask import Blueprint, jsonify, redirect, request, session, url_for
@@ -10,6 +11,7 @@ from app.services.scale_service import (
     get_scale_service,
     is_available,
     list_ports,
+    _get_status_code_and_message,
 )
 
 scale_bp = Blueprint("scale", __name__)
@@ -44,7 +46,13 @@ def _require_csrf(f):
 def api_list_ports():
     """List available serial ports."""
     ports = list_ports()
-    return jsonify({"ports": ports, "available": is_available()})
+    code, message = _get_status_code_and_message(False, "")
+    return jsonify({
+        "ports": ports,
+        "available": is_available(),
+        "code": code,
+        "message": message,
+    })
 
 
 @scale_bp.get("/api/scale/status")
@@ -74,7 +82,10 @@ def api_scale_connect():
         return jsonify({"error": f"Ya conectado a {svc.port_name}. Desconecte primero."}), 409
 
     if not is_available():
-        return jsonify({"error": "Lectura de bascula no disponible. Instale pyserial."}), 503
+        return jsonify({
+            "error": "El componente serial no esta instalado.",
+            "code": "pyserial_unavailable",
+        }), 503
 
     port = (data.get("port") or "").strip()
     if not port:
@@ -103,14 +114,18 @@ def api_scale_connect():
     try:
         config = load_scale_config()
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e), "code": "invalid_configuration"}), 400
 
     try:
         svc.connect(config)
     except ScaleUnavailableError as e:
-        return jsonify({"error": str(e)}), 503
+        return jsonify({
+            "error": str(e),
+            "code": "pyserial_unavailable",
+        }), 503
     except ScaleConnectionError as e:
-        return jsonify({"error": str(e)}), 422
+        code = svc.get_status().get("code", "serial_read_error")
+        return jsonify({"error": str(e), "code": code}), 422
 
     return jsonify(svc.get_status())
 

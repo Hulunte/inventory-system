@@ -18,6 +18,24 @@
     var lastWeight = null;
     var lastStable = false;
 
+    var MESSAGES = {
+        pyserial_unavailable:
+            "Falta el componente de comunicacion serial. Debe reinstalar el programa.",
+        no_serial_ports:
+            "No hay puertos seriales disponibles. Conecte la bascula y actualice.",
+        scale_not_connected:
+            "Hay puertos disponibles, pero no se ha conectado una bascula.",
+        port_in_use:
+            "El puerto seleccionado esta siendo utilizado por otra aplicacion.",
+        connected: "Bascula conectada.",
+        serial_read_error:
+            "La bascula esta conectada, pero aun no se reconoce su formato.",
+        invalid_configuration:
+            "Configuracion serial invalida. Verifique los parametros.",
+        unsupported_platform:
+            "Plataforma no soportada para lectura serial.",
+    };
+
     function getCsrfToken() {
         var meta = document.querySelector('meta[name="csrf-token"]');
         csrfToken = meta ? meta.content : "";
@@ -49,26 +67,46 @@
         return { ok: resp.ok, status: resp.status, data: data };
     }
 
+    function messageForCode(code) {
+        return MESSAGES[code] || "Estado desconocido de la bascula.";
+    }
+
     async function loadPorts() {
         try {
             var result = await apiCall("GET", "/api/scale/ports");
             portSelect.textContent = "";
-            if (!result.ok || !result.data.available) {
+
+            if (result.status === 401 || result.status === 403) {
                 var opt = document.createElement("option");
                 opt.value = "";
-                opt.textContent = "pyserial no disponible";
+                opt.textContent = "Sesion expirada. Recargue la pagina.";
                 portSelect.appendChild(opt);
                 connectBtn.disabled = true;
                 return;
             }
-            if (result.data.ports.length === 0) {
+
+            var data = result.data || {};
+            var code = data.code || "";
+
+            if (!data.available) {
                 var opt = document.createElement("option");
                 opt.value = "";
-                opt.textContent = "No hay puertos seriales";
+                opt.textContent = MESSAGES[code] || MESSAGES.pyserial_unavailable;
                 portSelect.appendChild(opt);
+                connectBtn.disabled = true;
                 return;
             }
-            result.data.ports.forEach(function (p) {
+
+            if (!data.ports || data.ports.length === 0) {
+                var opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = MESSAGES[code] || MESSAGES.no_serial_ports;
+                portSelect.appendChild(opt);
+                connectBtn.disabled = true;
+                return;
+            }
+
+            data.ports.forEach(function (p) {
                 var opt = document.createElement("option");
                 opt.value = p.device;
                 opt.textContent = p.device + " - " + p.description;
@@ -81,6 +119,7 @@
             opt.value = "";
             opt.textContent = "Error al cargar puertos";
             portSelect.appendChild(opt);
+            connectBtn.disabled = true;
         }
     }
 
@@ -95,7 +134,8 @@
         try {
             var result = await apiCall("POST", "/api/scale/connect", { port: port });
             if (!result.ok) {
-                alert(result.data.error || "Error al conectar");
+                var msg = (result.data && result.data.error) || "Error al conectar";
+                alert(msg);
             }
             updateUiFromStatus(result.data);
         } catch (e) {
@@ -117,16 +157,21 @@
 
     function updateUiFromStatus(status) {
         if (!status) return;
+
+        var code = status.code || "";
+        var msg = status.message || messageForCode(code);
+
         isConnected = status.connected;
+
         if (isConnected) {
-            setText(connectionStatus, "Conectada");
+            setText(connectionStatus, msg);
             connectionStatus.className = "scale-section__status scale-section__status--connected";
             setHidden(connectBtn, true);
             setHidden(disconnectBtn, false);
             setHidden(readingArea, false);
             startPolling();
         } else {
-            setText(connectionStatus, "Desconectada");
+            setText(connectionStatus, msg);
             connectionStatus.className = "scale-section__status";
             setHidden(connectBtn, false);
             setHidden(disconnectBtn, true);
@@ -138,7 +183,8 @@
             lastStable = false;
             useWeightBtn.disabled = true;
         }
-        if (status.error) {
+
+        if (status.error && code !== "connected" && code !== "no_serial_ports" && code !== "scale_not_connected") {
             setText(readingError, status.error);
             setHidden(readingError, false);
         } else {

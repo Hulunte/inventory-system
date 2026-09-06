@@ -6,7 +6,7 @@ No Flask import at module level.
 """
 
 import logging
-import sys
+import platform
 import threading
 import time
 from datetime import datetime, timezone
@@ -17,17 +17,33 @@ from app.services.scale_parser import WeightReading, parse_weight_line, sanitize
 
 logger = logging.getLogger(__name__)
 
+HAS_PYSERIAL = False
+serial = None
+serial_list_ports = None
+
 try:
-    import serial
-    import serial.tools.list_ports
+    import serial as _serial
+    import serial.tools.list_ports as _list_ports
+    serial = _serial
+    serial_list_ports = _list_ports
     HAS_PYSERIAL = True
 except ImportError:
-    HAS_PYSERIAL = False
-    serial = None
+    pass
+except Exception:
+    pass
 
 MAX_RAW_LOG = 50
 RECONNECT_DELAY = 2.0
 MAX_RECONNECT_ATTEMPTS = 5
+
+STATUS_CONNECTED = "connected"
+STATUS_NO_SERIAL_PORTS = "no_serial_ports"
+STATUS_SCALE_NOT_CONNECTED = "scale_not_connected"
+STATUS_PORT_IN_USE = "port_in_use"
+STATUS_INVALID_CONFIGURATION = "invalid_configuration"
+STATUS_SERIAL_READ_ERROR = "serial_read_error"
+STATUS_UNSUPPORTED_PLATFORM = "unsupported_platform"
+STATUS_PYSERIAL_UNAVAILABLE = "pyserial_unavailable"
 
 
 class ScaleError(Exception):
@@ -50,11 +66,12 @@ def list_ports():
     """List available serial ports.
 
     Returns list of dicts with name, device, description.
+    Empty list when no ports found or PySerial unavailable.
     """
     if not HAS_PYSERIAL:
         return []
     try:
-        ports = serial.tools.list_ports.comports()
+        ports = serial_list_ports.comports()
         return [
             {
                 "name": p.device,
@@ -80,6 +97,33 @@ def validate_port_exists(port_name: str) -> bool:
         return False
 
 
+def _get_status_code_and_message(connected: bool, port: str) -> tuple:
+    """Determine status code and human-readable message."""
+    if not HAS_PYSERIAL:
+        return STATUS_PYSERIAL_UNAVAILABLE, (
+            "El componente serial no esta instalado."
+        )
+
+    if platform.system() not in ("Windows", "Linux", "Darwin"):
+        return STATUS_UNSUPPORTED_PLATFORM, (
+            "Plataforma no soportada para lectura serial."
+        )
+
+    if connected:
+        return STATUS_CONNECTED, "Bascula conectada."
+
+    ports = list_ports()
+    if not ports:
+        return STATUS_NO_SERIAL_PORTS, (
+            "No hay puertos seriales disponibles. "
+            "Conecte la bascula y actualice."
+        )
+
+    return STATUS_SCALE_NOT_CONNECTED, (
+        "Hay puertos disponibles, pero no se ha conectado una bascula."
+    )
+
+
 class ScaleService:
     """Manages a single serial scale connection with background reading."""
 
@@ -96,6 +140,7 @@ class ScaleService:
         self._reconnect_attempts = 0
         self._connected_at: Optional[datetime] = None
         self._error: Optional[str] = None
+        self._status_code: str = STATUS_SCALE_NOT_CONNECTED
 
     @property
     def connected(self) -> bool:
@@ -130,11 +175,13 @@ class ScaleService:
     def connect(self, config: ScaleConfig) -> None:
         """Open serial connection and start background reading."""
         if not HAS_PYSERIAL:
+            self._status_code = STATUS_PYSERIAL_UNAVAILABLE
             raise ScaleUnavailableError(
-                "Lectura de bascula no disponible. Instale pyserial."
+                "El componente serial no esta instalado."
             )
 
         if not validate_port_name(config.port):
+            self._status_code = STATUS_INVALID_CONFIGURATION
             raise ScaleConnectionError("Nombre de puerto invalido")
 
         with self._lock:
@@ -152,9 +199,11 @@ class ScaleService:
             )
         except serial.SerialException as e:
             self._error = f"Error al abrir {config.port}: {e}"
+            self._status_code = STATUS_PORT_IN_USE
             raise ScaleConnectionError(self._error) from e
         except Exception as e:
             self._error = f"Error inesperado al abrir {config.port}: {e}"
+            self._status_code = STATUS_INVALID_CONFIGURATION
             raise ScaleConnectionError(self._error) from e
 
         with self._lock:
@@ -164,6 +213,7 @@ class ScaleService:
             self._error = None
             self._connected_at = datetime.now(timezone.utc)
             self._reconnect_attempts = 0
+            self._status_code = STATUS_CONNECTED
 
         self._start_reader()
         logger.info("Connected to scale on %s", config.port)
@@ -173,17 +223,37 @@ class ScaleService:
         self._stop_reader()
         with self._lock:
             self._close_internal()
+        self._status_code = _get_status_code_and_message(False, self._port_name)[0]
         logger.info("Disconnected from scale")
 
     def get_status(self) -> dict:
-        """Get current connection status."""
+        """Get current connection status with code and message."""
         reading_dict = None
         if self._last_reading:
             reading_dict = self._last_reading.to_dict()
 
+        is_conn = self.connected
+
+        if is_conn:
+            code = STATUS_CONNECTED
+            message = "Bascula conectada."
+        elif self._error and self._status_code in (
+            STATUS_PORT_IN_USE, STATUS_INVALID_CONFIGURATION, STATUS_SERIAL_READ_ERROR,
+        ):
+            code = self._status_code
+            message = self._error
+        elif self._error and self._reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
+            code = STATUS_SERIAL_READ_ERROR
+            message = "Error de lectura serial persistente."
+        else:
+            code, message = _get_status_code_and_message(is_conn, self._port_name)
+
         return {
-            "available": HAS_PYSERIAL,
-            "connected": self.connected,
+            "pyserial_available": HAS_PYSERIAL,
+            "ports_available": bool(list_ports()),
+            "connected": is_conn,
+            "code": code,
+            "message": message,
             "port": self._port_name,
             "connected_at": self._connected_at.isoformat() if self._connected_at else None,
             "last_reading": reading_dict,
@@ -224,9 +294,13 @@ class ScaleService:
         while self._running:
             try:
                 self._read_once()
+            except ScaleConnectionError:
+                self._status_code = STATUS_SERIAL_READ_ERROR
+                self._attempt_reconnect()
             except Exception as e:
                 logger.debug("Read error: %s", e)
                 self._error = str(e)
+                self._status_code = STATUS_SERIAL_READ_ERROR
                 self._attempt_reconnect()
 
     def _read_once(self) -> None:
@@ -285,6 +359,7 @@ class ScaleService:
             return
         if self._reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
             self._error = "Maximo numero de reconexiones alcanzado"
+            self._status_code = STATUS_SERIAL_READ_ERROR
             self._running = False
             return
 
@@ -315,9 +390,15 @@ class ScaleService:
             with self._lock:
                 self._serial = ser
                 self._error = None
+            self._status_code = STATUS_CONNECTED
             logger.info("Reconnected to scale on %s", config.port)
+        except serial.SerialException as e:
+            self._error = f"Reconexion fallida: {e}"
+            self._status_code = STATUS_PORT_IN_USE
+            logger.debug("Reconnect failed: %s", e)
         except Exception as e:
             self._error = f"Reconexion fallida: {e}"
+            self._status_code = STATUS_INVALID_CONFIGURATION
             logger.debug("Reconnect failed: %s", e)
 
     def _close_internal(self) -> None:

@@ -12,14 +12,23 @@
     {% endif %}
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reports.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 </head>
 
 <body>
 
+    <div id="app-splash" class="app-splash" role="status" aria-label="Cargando aplicacion">
+        <img class="app-splash__logo" src="{{ url_for('static', filename='img/branding/logo-agricola-vita-santa-fe.png') }}" alt="Agricola Vita Santa Fe">
+        <p class="app-splash__text">Agr&iacute;cola Vita Santa Fe</p>
+    </div>
+
     <div class="reports-wrapper">
 
         <header class="reports-header">
-            <h1 class="reports-header__title">Reportes de cosecha</h1>
+            <div class="brand-header">
+                <img class="brand-logo brand-logo--compact" src="{{ url_for('static', filename='img/branding/logo-agricola-vita-santa-fe.png') }}" alt="Agricola Vita Santa Fe">
+                <h1 class="reports-header__title">Reportes de cosecha</h1>
+            </div>
             <nav class="reports-header__nav">
                 <a href="/" class="reports-header__link">Recepci&oacute;n</a>
                 <a href="/admin" class="reports-header__link">Administraci&oacute;n</a>
@@ -115,6 +124,7 @@
         };
     </script>
     <script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
 </body>
 
 </html>
