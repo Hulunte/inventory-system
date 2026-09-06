@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+
+    <title>Tickets diarios</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tickets.css') }}">
+</head>
+
+<body>
+
+    <div class="tickets-wrapper">
+
+        <header class="tickets-header">
+            <h1 class="tickets-header__title">Tickets diarios</h1>
+            <nav class="tickets-header__nav">
+                <a href="/" class="tickets-header__link">Recepci&oacute;n</a>
+                <a href="/admin" class="tickets-header__link">Administraci&oacute;n</a>
+                <a href="/admin/products" class="tickets-header__link">Productos</a>
+                <a href="/history" class="tickets-header__link">Historial</a>
+                <a href="/reports" class="tickets-header__link">Reportes</a>
+                <a href="/tickets" class="tickets-header__link tickets-header__link--active">Tickets</a>
+            </nav>
+        </header>
+
+        <section class="card filters">
+            <div class="filters__row">
+                <div class="filters__group">
+                    <label class="filters__label" for="date-input">Fecha</label>
+                    <input class="filters__input" type="date" id="date-input">
+                </div>
+
+                <div class="filters__group">
+                    <label class="filters__label" for="search-input">Buscar trabajador</label>
+                    <input class="filters__input" type="text" id="search-input"
+                        placeholder="Nombre, c&oacute;digo o cupo..." autocomplete="off">
+                </div>
+
+                <button class="filters__button" type="button" id="query-btn">
+                    Consultar
+                </button>
+            </div>
+        </section>
+
+        <section class="card" id="stats-section" hidden>
+            <div id="stats-bar" class="stats-bar"></div>
+        </section>
+
+        <section class="card" id="ticket-list-section">
+            <h2 class="card__title" id="ticket-list-title">Trabajadores</h2>
+            <div id="ticket-list">
+                <p class="empty-state">Seleccione una fecha para ver los tickets.</p>
+            </div>
+        </section>
+
+        <section class="card" id="preview-section" hidden>
+            <h2 class="card__title">Vista previa del ticket</h2>
+            <div id="preview-content" class="ticket-preview"></div>
+            <div class="preview-actions">
+                <button class="form__button" type="button" id="print-selected-btn">
+                    Imprimir seleccionado
+                </button>
+            </div>
+        </section>
+
+        <section class="card" id="printer-section">
+            <h2 class="card__title">Impresora</h2>
+
+            <div class="printer-controls">
+                <div class="form__row">
+                    <div class="form__group form__group--wide">
+                        <label class="form__label" for="printer-select">Impresora</label>
+                        <select class="form__input" id="printer-select">
+                            <option value="">Cargando impresoras...</option>
+                        </select>
+                        <span id="printer-status" class="printer-status"></span>
+                    </div>
+                </div>
+
+                <div class="form__row printer-actions">
+                    <button class="form__button form__button--secondary" type="button" id="refresh-printers-btn">
+                        Actualizar impresoras
+                    </button>
+                    <button class="form__button form__button--secondary" type="button" id="test-print-btn">
+                        Imprimir prueba
+                    </button>
+                </div>
+
+                <div id="printer-message" class="printer-message" hidden></div>
+
+                <div id="printer-unavailable" class="printer-warning" hidden>
+                    Impresi&oacute;n directa no disponible. Instale el controlador oficial de la impresora en Windows.
+                </div>
+            </div>
+
+            <div class="printer-divider"></div>
+
+            <h3 class="card__subtitle">Modos de impresion</h3>
+
+            <div class="print-modes">
+                <div class="print-mode">
+                    <h4 class="print-mode__title">A. Imprimir seleccionado</h4>
+                    <p class="print-mode__desc">Seleccione un trabajador y haga clic en "Imprimir seleccionado".</p>
+                </div>
+
+                <div class="print-mode">
+                    <h4 class="print-mode__title">B. Imprimir todos automaticamente</h4>
+                    <p class="print-mode__desc">
+                        Imprime cada ticket en secuencia sin confirmacion individual.
+                    </p>
+                    <button class="form__button form__button--warning" type="button" id="print-all-auto-btn">
+                        Imprimir todos (automatico)
+                    </button>
+                </div>
+
+                <div class="print-mode">
+                    <h4 class="print-mode__title">C. Imprimir todos con confirmacion</h4>
+                    <p class="print-mode__desc">
+                        Muestra cada ticket antes de imprimir para confirmar, omitir o detener.
+                    </p>
+                    <button class="form__button form__button--warning" type="button" id="print-all-confirm-btn">
+                        Imprimir todos (con confirmacion)
+                    </button>
+                </div>
+            </div>
+
+            <div id="print-progress" class="print-progress" hidden>
+                <div class="print-progress__bar">
+                    <div class="print-progress__fill" id="progress-fill"></div>
+                </div>
+                <p class="print-progress__text" id="progress-text"></p>
+            </div>
+
+            <div id="confirm-dialog" class="confirm-dialog" hidden>
+                <div class="confirm-dialog__info">
+                    <p id="confirm-worker-info"></p>
+                </div>
+                <div class="confirm-dialog__actions" id="confirm-actions">
+                    <button class="form__button" type="button" id="confirm-print-btn">Imprimir y continuar</button>
+                    <button class="form__button form__button--secondary" type="button" id="confirm-skip-btn">Omitir</button>
+                    <button class="form__button form__button--danger" type="button" id="confirm-stop-btn">Detener</button>
+                </div>
+                <div class="confirm-dialog__actions" id="error-actions" hidden>
+                    <button class="form__button form__button--warning" type="button" id="error-retry-btn">Reintentar</button>
+                    <button class="form__button form__button--secondary" type="button" id="error-skip-btn">Omitir</button>
+                    <button class="form__button form__button--danger" type="button" id="error-stop-btn">Detener</button>
+                </div>
+                <div id="confirm-message" class="confirm-message" hidden></div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        window.TICKETS_CONFIG = {
+            operationalToday: {{ operational_today | tojson }},
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
+</body>
+
+</html>
