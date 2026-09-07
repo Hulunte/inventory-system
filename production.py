@@ -1,4 +1,5 @@
 import os
+import sys
 
 
 def _has_leading_or_trailing_whitespace(value):
@@ -106,17 +107,14 @@ def validate_production_config(environ=None):
 
 def main():
     # Load .env file before reading any environment variables.
-    # Must happen before validate_production_config() and APP_HOST/APP_PORT reads.
     from dotenv import load_dotenv
     load_dotenv()
 
     # Validate mandatory configuration before creating the app.
-    # Raises SystemExit immediately if any required variable is missing or invalid.
     validate_production_config()
 
     host = os.getenv("APP_HOST", "0.0.0.0")
 
-    # APP_PORT with strict validation
     port_str = os.getenv("APP_PORT", "5000")
     try:
         port = int(port_str)
@@ -129,14 +127,15 @@ def main():
             f"ERROR: APP_PORT='{port_str}' must be an integer in range 1-65535"
         )
 
-    # Create the application via the existing factory
     from app import create_app
     app = create_app()
 
-    # Debug is explicitly disabled — no fallback, no Werkzeug dev server
+    # Debug is explicitly disabled
     app.debug = False
 
-    # Import serve inside main() to facilitate mocking in tests
+    print(f"Starting inventory-system on {host}:{port}", file=sys.stdout)
+    print("Debug mode: DISABLED", file=sys.stdout)
+
     from waitress import serve
     serve(app, host=host, port=port)
 

@@ -1,4 +1,5 @@
 import os
+import sys
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
@@ -75,6 +76,36 @@ class Config:
         footer_text = app.config.get("TICKET_FOOTER_TEXT", "")
         if len(footer_text) > 60:
             raise ValueError(f"TICKET_FOOTER_TEXT must be at most 60 characters, got {len(footer_text)}")
+
+
+class ProductionConfig(Config):
+    """Production configuration with mandatory env validation."""
+
+    REQUIRED_VARS = ("SECRET_KEY", "DATABASE_URL", "ADMIN_PASSWORD_HASH")
+
+    @classmethod
+    def validate(cls):
+        missing = [v for v in cls.REQUIRED_VARS if not os.getenv(v)]
+        if missing:
+            msg = (
+                "Faltan variables de entorno obligatorias: "
+                + ", ".join(missing)
+                + ". Copie .env.example a .env y configure los valores."
+            )
+            print(f"ERROR: {msg}", file=sys.stderr)
+            raise SystemExit(msg)
+
+        secret = os.getenv("SECRET_KEY", "")
+        if len(secret) < 16:
+            msg = "SECRET_KEY debe tener al menos 16 caracteres."
+            print(f"ERROR: {msg}", file=sys.stderr)
+            raise SystemExit(msg)
+
+        db_url = os.getenv("DATABASE_URL", "")
+        if "sqlite" in db_url.lower():
+            msg = "DATABASE_URL no debe apuntar a SQLite en produccion. Use PostgreSQL."
+            print(f"ERROR: {msg}", file=sys.stderr)
+            raise SystemExit(msg)
 
 
 class TestConfig(Config):

@@ -1,7 +1,34 @@
-from flask import Flask
+import logging
+import os
+import sys
+import time
+
+from flask import Flask, jsonify
 
 from config import Config
 from app.extensions import db, migrate
+
+logger = logging.getLogger(__name__)
+
+
+def _check_postgres(uri):
+    """Return (ok: bool, message: str)."""
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(uri, pool_pre_ping=True, connect_args={"connect_timeout": 5})
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        engine.dispose()
+        return True, "ok"
+    except Exception as exc:
+        msg = str(exc)
+        if "could not connect" in msg.lower() or "Connection refused" in msg:
+            return False, "PostgreSQL no esta disponible. Verifique que el servicio este corriendo."
+        if "authentication failed" in msg.lower():
+            return False, "Credenciales de PostgreSQL incorrectas. Verifique DATABASE_URL."
+        if "does not exist" in msg.lower():
+            return False, "La base de datos no existe. Verifique el nombre en DATABASE_URL."
+        return False, f"Error de conexion a PostgreSQL: {msg[:200]}"
 
 
 def create_app(config_class=None):
@@ -37,8 +64,33 @@ def create_app(config_class=None):
     app.register_blueprint(scale_bp)
     app.register_blueprint(views_bp)
 
+    _register_error_handlers(app)
+
     @app.get("/api/health")
     def health():
-        return {"status": "ok"}
+        db_uri = app.config.get("SQLALCHEMY_DATABASE_URI")
+        if not db_uri:
+            return jsonify({"status": "degraded", "database": "not_configured"}), 503
+
+        db_ok, db_msg = _check_postgres(db_uri)
+        if not db_ok:
+            return jsonify({"status": "degraded", "database": db_msg}), 503
+
+        return jsonify({"status": "ok", "database": "connected"}), 200
 
     return app
+
+
+def _register_error_handlers(app):
+    @app.errorhandler(500)
+    def internal_error(error):
+        logger.error("Internal server error: %s", error)
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+    @app.errorhandler(502)
+    def bad_gateway(error):
+        return jsonify({"error": "Servicio temporalmente no disponible"}), 502
+
+    @app.errorhandler(503)
+    def service_unavailable(error):
+        return jsonify({"error": "Servicio no disponible"}), 503
