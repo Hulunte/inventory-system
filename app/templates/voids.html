@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Anulaciones</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
+</head>
+<body>
+    <div id="app-splash" class="app-splash" role="status" aria-label="Cargando aplicacion">
+        <img class="app-splash__logo" src="{{ url_for('static', filename='img/branding/logo-agricola-vita-santa-fe.png') }}" alt="Agricola Vita Santa Fe">
+        <p class="app-splash__text">Agr&iacute;cola Vita Santa Fe</p>
+    </div>
+
+    <main class="history-wrapper">
+        <header class="history-header">
+            <div class="brand-header">
+                <img class="brand-logo brand-logo--compact" src="{{ url_for('static', filename='img/branding/logo-agricola-vita-santa-fe.png') }}" alt="Agricola Vita Santa Fe">
+                <h1 class="history-header__title">Anulaciones</h1>
+            </div>
+            <nav class="history-header__nav" aria-label="Navegaci&oacute;n principal">
+                <a href="/" class="history-header__link">Recepci&oacute;n</a>
+                <a href="/admin" class="history-header__link">Administraci&oacute;n</a>
+                <a href="/history" class="history-header__link">Historial</a>
+                <a href="/reports" class="history-header__link">Reportes</a>
+                <a href="/anulaciones" class="history-header__link history-header__link--active">Anulaciones</a>
+                <a href="/tickets" class="history-header__link">Tickets</a>
+            </nav>
+        </header>
+
+        <section class="card filters">
+            <div class="filters__group">
+                <label class="filters__label" for="active-date">Fecha de movimientos activos</label>
+                <input class="filters__input" id="active-date" type="date" value="{{ operational_today }}">
+            </div>
+            <div class="filters__group">
+                <label class="filters__label" for="void-search">Buscar en anulados</label>
+                <input class="filters__input" id="void-search" type="search"
+                    placeholder="Trabajador, código, cupo o producto" autocomplete="off">
+            </div>
+        </section>
+
+        <section class="card">
+            <h2 class="card__title">Movimientos activos</h2>
+            <div id="active-entries-content"><p class="empty-state">Cargando...</p></div>
+        </section>
+
+        <section class="card">
+            <h2 class="card__title">Movimientos anulados</h2>
+            <div id="voids-content"><p class="empty-state">Cargando...</p></div>
+        </section>
+    </main>
+
+    <div id="void-modal" class="modal" hidden>
+        <div class="modal__content" role="dialog" aria-modal="true" aria-labelledby="void-modal-title">
+            <h3 class="modal__title" id="void-modal-title">Anular movimiento</h3>
+            <p class="modal__text" id="void-modal-text"></p>
+            <div class="form__group">
+                <label class="form__label" for="void-reason-input">Motivo de anulaci&oacute;n *</label>
+                <textarea class="form__input" id="void-reason-input" rows="3" maxlength="500"
+                    placeholder="Describa el motivo de la anulaci&oacute;n" required></textarea>
+            </div>
+            <p id="void-action-message" class="form__message" role="status" hidden></p>
+            <div class="modal__actions">
+                <button class="btn btn--cancel" type="button" id="void-cancel-btn">Cancelar</button>
+                <button class="btn btn--danger" type="button" id="void-confirm-btn">Confirmar anulaci&oacute;n</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/voids.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
+</body>
+</html>

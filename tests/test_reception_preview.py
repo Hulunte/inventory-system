@@ -292,6 +292,7 @@ class TestPublicFields:
         expected_keys = {
             "id", "time", "worker", "worker_assignment_id",
             "product_name", "weight_kg", "rate_per_kg", "amount_mxn", "voided",
+            "can_void",
         }
         assert set(m.keys()) == expected_keys
         assert set(m["worker"].keys()) == {"name", "barcode", "slot_number", "slot_label"}
@@ -460,6 +461,22 @@ class TestHtmlStructure:
         assert 'id="refresh-movements"' in html
         assert 'aria-live="polite"' in html
 
+    def test_preview_is_immediately_after_dynamic_weight_area(self, client):
+        html = client.get("/").get_data(as_text=True)
+        product_info = html.index('id="product-info"')
+        preview = html.index('id="recent-movements"')
+        assert product_info < preview
+        between = html[product_info:preview]
+        assert "scale-section" not in between
+
+    def test_mobile_preview_is_compact_without_fixed_overlay(self, client):
+        css = client.get("/static/css/reception.css").get_data(as_text=True)
+        assert ".recent-movements .movements-list" in css
+        assert "max-height: 13rem" in css
+        assert "overflow-y: auto" in css
+        recent_rule = css.split(".recent-movements {", 1)[1].split("}", 1)[0]
+        assert "position: fixed" not in recent_rule
+
 
 # ---------------------------------------------------------------------------
 # 19. JS evidence (consolidated)
@@ -481,11 +498,12 @@ class TestJsEvidence:
         assert "/api/harvest/recent" in js
         assert "slot_label" in js
 
-    def test_no_void_controls(self, client):
+    def test_quick_void_controls(self, client):
         resp = client.get("/static/js/reception.js")
         js = resp.data.decode()
-        assert "void-entry" not in js
-        assert "voidEntry" not in js
-        assert "anular" not in js.lower()
+        assert "data-void-entry-id" in js
+        assert "Anulación rápida" in js
+        assert "window.confirm" in js
+        assert '"X-CSRF-Token"' in js
         assert "unvoid" not in js.lower()
         assert "restore-entry" not in js

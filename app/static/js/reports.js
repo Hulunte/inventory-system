@@ -134,6 +134,7 @@ async function loadReport() {
                         <th>Código</th>
                         <th class="num">Tandas</th>
                         <th class="num">Total kg</th>
+                        <th class="num">Importe</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -144,6 +145,7 @@ async function loadReport() {
                             <td class="mono">${w.barcode ? escapeHtml(w.barcode) : "—"}</td>
                             <td class="num">${w.entries_count}</td>
                             <td class="num bold">${w.total_weight_kg}</td>
+                            <td class="num bold">$${w.total_amount_mxn}</td>
                         </tr>
                     `).join("")}
                 </tbody>
@@ -152,6 +154,7 @@ async function loadReport() {
                         <td colspan="3">TOTAL</td>
                         <td class="num">${data.summary.total_entries}</td>
                         <td class="num bold">${data.summary.total_weight_kg}</td>
+                        <td class="num bold">$${data.summary.total_amount_mxn}</td>
                     </tr>
                 </tfoot>
             </table>

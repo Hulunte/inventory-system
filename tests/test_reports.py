@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal
 
 from app.models.harvest_entry import HarvestEntry
+from app.models.product import Product
 from app.extensions import db
 from app.services.report_service import get_harvest_report, parse_date
 from tests.conftest import make_worker, make_worker_with_assignment
@@ -36,6 +37,48 @@ class TestParseDate:
 
 
 class TestHarvestReport:
+    def test_report_includes_worker_and_grand_total_amount(self, db_session, app):
+        tz = app.config["HARVEST_TIMEZONE"]
+        today = datetime.now(tz).date()
+        start = datetime.combine(today, datetime.min.time(), tzinfo=tz).astimezone(timezone.utc)
+        worker, assignment = make_worker_with_assignment(db_session, name="Importe visible Rpt")
+        product = Product(name="Producto importe visible Rpt", rate_per_kg=Decimal("10.00"))
+        db_session.add(product)
+        db_session.flush()
+        db_session.add_all([
+            HarvestEntry(
+                worker_id=worker.id, worker_assignment_id=assignment.id,
+                worker_slot_number_snapshot=worker.slot_number,
+                worker_barcode_snapshot=worker.barcode,
+                worker_name_snapshot=assignment.person_name,
+                product_id=product.id, product_name_snapshot=product.name,
+                rate_per_kg_snapshot=Decimal("10.00"),
+                weight_kg=Decimal("2.000"), amount_mxn=Decimal("25.50"),
+                created_at=start + timedelta(hours=8),
+            ),
+            HarvestEntry(
+                worker_id=worker.id, worker_assignment_id=assignment.id,
+                worker_slot_number_snapshot=worker.slot_number,
+                worker_barcode_snapshot=worker.barcode,
+                worker_name_snapshot=assignment.person_name,
+                product_id=product.id, product_name_snapshot=product.name,
+                rate_per_kg_snapshot=Decimal("10.00"),
+                weight_kg=Decimal("3.000"), amount_mxn=Decimal("31.25"),
+                created_at=start + timedelta(hours=9),
+            ),
+        ])
+        db_session.commit()
+
+        result = get_harvest_report(today, today, query_filter="Importe visible Rpt", tz=tz)
+        assert result["workers"][0]["total_amount_mxn"] == "56.75"
+        assert result["summary"]["total_amount_mxn"] == "56.75"
+
+    def test_reports_frontend_renders_amount_column(self, client):
+        source = client.get("/static/js/reports.js").get_data(as_text=True)
+        assert '<th class="num">Importe</th>' in source
+        assert "w.total_amount_mxn" in source
+        assert "data.summary.total_amount_mxn" in source
+
     def test_report_with_entries(self, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():

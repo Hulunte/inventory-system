@@ -74,7 +74,9 @@ class Config:
     SCALE_STOPBITS = float(os.getenv("SCALE_STOPBITS", "1"))
     SCALE_TIMEOUT_SECONDS = float(os.getenv("SCALE_TIMEOUT_SECONDS", "1.0"))
     SCALE_LINE_ENCODING = os.getenv("SCALE_LINE_ENCODING", "ascii")
-    SCALE_PROFILE = os.getenv("SCALE_PROFILE", "auto")
+    SCALE_PROFILE = os.getenv("SCALE_PROFILE", "generic")
+    SCALE_TERMINATOR = os.getenv("SCALE_TERMINATOR", "CR")
+    SCALE_HANDSHAKE = os.getenv("SCALE_HANDSHAKE", "none")
     SCALE_MIN_WEIGHT_KG = os.getenv("SCALE_MIN_WEIGHT_KG", "0.001")
     SCALE_MAX_WEIGHT_KG = os.getenv("SCALE_MAX_WEIGHT_KG", "999.999")
 

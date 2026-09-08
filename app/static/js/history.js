@@ -6,7 +6,7 @@ const detailSection = document.getElementById("detail-section");
 const detailTitle = document.getElementById("detail-title");
 const detailContent = document.getElementById("detail-content");
 
-let selectedWorkerId = null;
+let selectedAssignmentId = null;
 let searchTimeout = null;
 
 
@@ -21,7 +21,7 @@ initDate();
 
 
 dateInput.addEventListener("change", () => {
-    selectedWorkerId = null;
+    selectedAssignmentId = null;
     detailSection.hidden = true;
     loadSummary();
 });
@@ -88,8 +88,8 @@ async function loadSummary() {
                 </thead>
                 <tbody>
                     ${data.workers.map(w => `
-                        <tr class="summary-row ${w.worker_id === selectedWorkerId ? "summary-row--selected" : ""}"
-                            data-worker-id="${w.worker_id}">
+                        <tr class="summary-row ${w.worker_assignment_id === selectedAssignmentId ? "summary-row--selected" : ""}"
+                            data-assignment-id="${w.worker_assignment_id}">
                             <td>${w.slot_label ? escapeHtml(w.slot_label) : "—"}</td>
                             <td>${w.name ? escapeHtml(w.name) : "Sin asignar"}</td>
                             <td class="mono">${w.barcode ? escapeHtml(w.barcode) : "—"}</td>
@@ -110,8 +110,8 @@ async function loadSummary() {
 
         document.querySelectorAll(".summary-row").forEach(row => {
             row.addEventListener("click", () => {
-                const workerId = parseInt(row.dataset.workerId, 10);
-                selectWorker(workerId, data.date);
+                const assignmentId = parseInt(row.dataset.assignmentId, 10);
+                selectAssignment(assignmentId, data.date);
             });
         });
 
@@ -121,12 +121,12 @@ async function loadSummary() {
 }
 
 
-async function selectWorker(workerId, date) {
-    selectedWorkerId = workerId;
+async function selectAssignment(assignmentId, date) {
+    selectedAssignmentId = assignmentId;
 
     document.querySelectorAll(".summary-row").forEach(row => {
         row.classList.toggle("summary-row--selected",
-            parseInt(row.dataset.workerId, 10) === workerId);
+            parseInt(row.dataset.assignmentId, 10) === assignmentId);
     });
 
     detailSection.hidden = false;
@@ -134,7 +134,7 @@ async function selectWorker(workerId, date) {
 
     try {
         const response = await fetch(
-            `/api/history/assignments/${workerId}/entries?date=${encodeURIComponent(date)}`
+            `/api/history/assignments/${assignmentId}/entries?date=${encodeURIComponent(date)}`
         );
 
         if (!response.ok) {

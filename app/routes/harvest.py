@@ -1,9 +1,10 @@
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, jsonify, make_response, request
+from flask import Blueprint, jsonify, make_response, request, session
 
 from app.exceptions import ProductUnavailableError
 from app.services.harvest_service import (
+    ANONYMOUS_WORKER_NAME,
     WorkerUnassignedError,
     get_all_entries,
     get_daily_total,
@@ -129,20 +130,14 @@ def get_daily(barcode):
         worker_id=worker.id, ended_at=None
     ).first()
 
-    if open_assignment is None:
-        return jsonify({
-            "error": "Este cupo no tiene una persona asignada.",
-            "code": "worker_unassigned",
-        }), 409
-
-    daily_total = get_daily_total(open_assignment.id)
+    daily_total = get_daily_total(open_assignment.id) if open_assignment else Decimal("0")
 
     return jsonify(
         {
             "worker": {
                 "id": worker.id,
                 "barcode": worker.barcode,
-                "name": worker.name,
+                "name": open_assignment.person_name if open_assignment else ANONYMOUS_WORKER_NAME,
                 "slot_number": worker.slot_number,
                 "slot_label": worker.slot_label,
             },
@@ -207,7 +202,7 @@ def list_recent_movements():
     if limit < 1 or limit > 20:
         return jsonify({"error": "limit must be between 1 and 20"}), 400
 
-    movements = get_recent_movements(limit=limit)
+    movements = get_recent_movements(limit=limit, can_void=bool(session.get("admin")))
     response = make_response(jsonify({"movements": movements}))
     response.headers["Cache-Control"] = "no-store"
     return response
