@@ -62,7 +62,7 @@ def is_available() -> bool:
     return HAS_PYSERIAL
 
 
-def list_ports():
+def list_ports(*, raise_errors=False):
     """List available serial ports.
 
     Returns list of dicts with name, device, description.
@@ -81,6 +81,8 @@ def list_ports():
             for p in ports
         ]
     except Exception:
+        if raise_errors:
+            raise
         return []
 
 

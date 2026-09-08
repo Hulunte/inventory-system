@@ -809,10 +809,10 @@ class TestGetWeekRanges:
 
 
 class TestReportButtonVisibility:
-    def test_export_button_not_rendered_without_session(self, client):
+    def test_reports_redirect_without_session(self, client):
         resp = client.get("/reports")
-        assert resp.status_code == 200
-        assert b"Exportar inventario" not in resp.data
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/admin/login")
 
     def test_export_button_rendered_with_admin_session(self, admin_client):
         resp = admin_client.get("/reports")

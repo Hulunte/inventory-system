@@ -170,6 +170,10 @@ function renderProduct(product) {
     const actionClass = product.active ? "btn--danger" : "btn--success";
     const actionEndpoint = product.active ? "deactivate" : "activate";
 
+    const deleteButton = !product.active
+        ? `<button class="btn btn--danger" type="button" data-product-id="${product.id}" data-action="delete">Eliminar</button>`
+        : "";
+
     return `
         <div class="worker-row">
             <div class="worker-row__info">
@@ -194,6 +198,7 @@ function renderProduct(product) {
                 >
                     ${actionLabel}
                 </button>
+                ${deleteButton}
             </div>
         </div>
     `;
@@ -217,6 +222,41 @@ productList.addEventListener("click", async (event) => {
         editProductMessage.hidden = true;
         editProductModal.hidden = false;
         editProductName.focus();
+        return;
+    }
+
+    if (action === "delete") {
+        if (!confirm("\u00bfDesea eliminar este producto permanentemente? Esta acci\u00f3n no se puede deshacer.")) {
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = "Eliminando...";
+
+        try {
+            const response = await fetch(`/api/admin/products/${productId}`, {
+                method: "DELETE",
+                headers: apiHeaders(),
+            });
+
+            if (response.status === 401) {
+                window.location.href = "/admin/login";
+                return;
+            }
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "No fue posible eliminar el producto");
+            }
+
+            loadProducts(productSearchInput.value.trim());
+
+        } catch (error) {
+            alert(error.message);
+            button.disabled = false;
+            button.textContent = "Eliminar";
+        }
         return;
     }
 

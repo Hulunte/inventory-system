@@ -11,7 +11,6 @@ from app.services.scale_service import (
     get_scale_service,
     is_available,
     list_ports,
-    _get_status_code_and_message,
 )
 
 scale_bp = Blueprint("scale", __name__)
@@ -42,14 +41,34 @@ def _require_csrf(f):
 
 
 @scale_bp.get("/api/scale/ports")
-@_require_admin
 def api_list_ports():
-    """List available serial ports."""
-    ports = list_ports()
-    code, message = _get_status_code_and_message(False, "")
+    """List serial ports without opening them or requiring an admin session."""
+    if not is_available():
+        return jsonify({
+            "ports": [],
+            "available": False,
+            "code": "pyserial_unavailable",
+            "message": "PySerial no disponible",
+        }), 503
+
+    try:
+        ports = list_ports(raise_errors=True)
+    except Exception:
+        return jsonify({
+            "error": "No se pudo consultar la disponibilidad de puertos.",
+            "code": "serial_port_enumeration_error",
+        }), 500
+
+    if ports:
+        code = "scale_not_connected"
+        message = "Hay puertos disponibles, pero no se ha conectado una báscula."
+    else:
+        code = "no_serial_ports"
+        message = "No hay puertos disponibles"
+
     return jsonify({
         "ports": ports,
-        "available": is_available(),
+        "available": True,
         "code": code,
         "message": message,
     })

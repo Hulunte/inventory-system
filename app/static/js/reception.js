@@ -6,8 +6,16 @@ const movementsContent = document.getElementById("movements-content");
 const refreshMovementsBtn = document.getElementById("refresh-movements");
 
 const STORAGE_KEY = "inventory.selectedProductId";
+const SCANNER_DEBUG = new URLSearchParams(window.location.search)
+    .get("scannerDebug") === "1";
 let selectedProductId = null;
 let allProducts = [];
+
+function scannerDebug(message) {
+    if (SCANNER_DEBUG) {
+        console.log(message);
+    }
+}
 
 function escapeHtml(text) {
     const div = document.createElement("div");
@@ -73,6 +81,11 @@ function selectProduct(productId) {
         /* storage unavailable */
     }
     renderProductButtons();
+
+    const weightInput = document.getElementById("weight_kg");
+    if (weightInput) {
+        scrollToWeightControl(weightInput);
+    }
 }
 
 function restoreSelection() {
@@ -111,16 +124,112 @@ function restoreSelection() {
 loadProducts();
 
 
+function findScrollableAncestor(element) {
+    let parent = element.parentElement;
+    while (parent && parent !== document.body) {
+        const style = window.getComputedStyle(parent);
+        if (
+            parent.scrollHeight > parent.clientHeight
+            && ["auto", "scroll"].includes(style.overflowY)
+        ) {
+            return parent;
+        }
+        parent = parent.parentElement;
+    }
+    return null;
+}
+
+function debugScrollAncestors(element) {
+    if (!SCANNER_DEBUG) {
+        return;
+    }
+    let node = element;
+    while (node && node !== document.body) {
+        const style = window.getComputedStyle(node);
+        console.log(node, {
+            overflowY: style.overflowY,
+            scrollHeight: node.scrollHeight,
+            clientHeight: node.clientHeight
+        });
+        node = node.parentElement;
+    }
+}
+
+async function scrollToWeightControl(element) {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    if (!element || !element.isConnected) {
+        return false;
+    }
+
+    const style = window.getComputedStyle(element);
+    const isVisible = style.display !== "none"
+        && style.visibility !== "hidden"
+        && element.offsetWidth > 0
+        && element.offsetHeight > 0;
+    if (!isVisible) {
+        return false;
+    }
+
+    debugScrollAncestors(element);
+    element.focus({ preventScroll: true });
+
+    return new Promise((resolve) => {
+        window.setTimeout(() => {
+            if (!element.isConnected) {
+                resolve(false);
+                return;
+            }
+
+            const scrollableParent = findScrollableAncestor(element);
+            const elementRect = element.getBoundingClientRect();
+            if (scrollableParent) {
+                const parentRect = scrollableParent.getBoundingClientRect();
+                scrollableParent.scrollTop += elementRect.top - parentRect.top
+                    - (scrollableParent.clientHeight - elementRect.height) / 2;
+            } else {
+                window.scrollTo({
+                    top: window.scrollY + elementRect.top
+                        - (window.innerHeight - elementRect.height) / 2,
+                    behavior: "smooth"
+                });
+            }
+            element.focus({ preventScroll: true });
+            scannerDebug("scroll ejecutado");
+            resolve(true);
+        }, 300);
+    });
+}
+
+async function restoreBarcodePosition(scrollTop) {
+    barcodeInput.focus({ preventScroll: true });
+    barcodeInput.select();
+    const restoreScroll = () => {
+        const scrollingElement = document.scrollingElement;
+        if (scrollingElement && typeof scrollingElement.scrollTo === "function") {
+            scrollingElement.scrollTo({ top: scrollTop, behavior: "instant" });
+            scrollingElement.scrollTop = scrollTop;
+        }
+    };
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    restoreScroll();
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    restoreScroll();
+}
+
+
 barcodeInput.addEventListener("keydown", async (event) => {
     if (event.key !== "Enter") {
         return;
     }
 
     event.preventDefault();
-    barcodeInput.blur();
+    scannerDebug("scanner enter recibido");
+    const initialScrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
     const barcode = barcodeInput.value.trim();
 
     if (!barcode) {
+        await restoreBarcodePosition(initialScrollTop);
         return;
     }
 
@@ -144,7 +253,7 @@ barcodeInput.addEventListener("keydown", async (event) => {
                 </div>
             `;
 
-            barcodeInput.select();
+            await restoreBarcodePosition(initialScrollTop);
             return;
         }
 
@@ -162,10 +271,12 @@ barcodeInput.addEventListener("keydown", async (event) => {
                     <p>Este cupo no tiene una persona asignada. Contacte al administrador.</p>
                 </div>
             `;
-            barcodeInput.select();
+            await restoreBarcodePosition(initialScrollTop);
             return;
         }
 
+        scannerDebug("trabajador validado");
+        barcodeInput.blur();
         await showWorker(worker);
 
     } catch (error) {
@@ -176,6 +287,7 @@ barcodeInput.addEventListener("keydown", async (event) => {
                 No fue posible consultar el trabajador.
             </div>
         `;
+        await restoreBarcodePosition(initialScrollTop);
     }
 });
 
@@ -212,7 +324,7 @@ async function showWorker(worker) {
                     </div>
                 </div>
 
-                <div class="receipt-form">
+                <section class="receipt-form" id="weight-entry-section">
                     <label class="receipt-form__label" for="weight_kg">
                         Peso de la tanda (kg)
                     </label>
@@ -233,7 +345,7 @@ async function showWorker(worker) {
                     >
                         Registrar pesada
                     </button>
-                </div>
+                </section>
             </div>
         `;
 
@@ -241,12 +353,7 @@ async function showWorker(worker) {
         const weightInput = document.getElementById("weight_kg");
         const registerButton = document.getElementById("register-receipt");
 
-        requestAnimationFrame(() => {
-            setTimeout(() => {
-                weightInput.focus({ preventScroll: true });
-                weightInput.select();
-            }, 150);
-        });
+        await scrollToWeightControl(weightInput);
 
         weightInput.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {

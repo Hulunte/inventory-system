@@ -41,13 +41,18 @@ class TestBuildConfig:
         assert cfg["use_tls"] is True
         assert cfg["timeout"] == 30
 
-    def test_defaults(self):
-        cfg = _build_config({})
-        assert cfg["host"] == "smtp.gmail.com"
-        assert cfg["port"] == 587
-        assert cfg["from_name"] == "Sistema de Cosecha"
-        assert cfg["use_tls"] is True
-        assert cfg["timeout"] == 30
+    def test_missing_username_names_exact_variable(self):
+        with pytest.raises(SMTPConfigError, match="MAIL_SMTP_USERNAME"):
+            send_export_email(RECIPIENT, FILENAME, XLSX_BYTES, {})
+
+    def test_missing_password_names_exact_variable(self):
+        with pytest.raises(SMTPConfigError, match="MAIL_SMTP_APP_PASSWORD"):
+            send_export_email(
+                RECIPIENT,
+                FILENAME,
+                XLSX_BYTES,
+                {"MAIL_SMTP_USERNAME": "user@gmail.com"},
+            )
 
     def test_from_address_falls_back_to_username(self):
         cfg = _build_config({

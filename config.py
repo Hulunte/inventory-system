@@ -1,15 +1,40 @@
 import os
+import secrets
 import sys
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+
+def _get_base_dir():
+    """Return the directory where persistent files (.env, logs) live.
+
+    In a PyInstaller frozen bundle the module's __file__ points to the
+    temporary ``_MEIPASS`` extraction directory, so we must use the
+    directory that contains the ``.exe`` itself.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+_base = _get_base_dir()
+
+if getattr(sys, "frozen", False):
+    _env_path = os.path.join(_base, ".env")
+    if os.path.isfile(_env_path):
+        load_dotenv(_env_path, override=False)
+else:
+    _env_file = find_dotenv(usecwd=True)
+    if _env_file:
+        load_dotenv(_env_file, override=False)
+    else:
+        load_dotenv(override=False)
 
 
 class Config:
-    SECRET_KEY = os.getenv("SECRET_KEY")
+    SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     HARVEST_TIMEZONE = ZoneInfo(os.getenv("HARVEST_TIMEZONE", "UTC"))

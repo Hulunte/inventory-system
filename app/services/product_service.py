@@ -163,3 +163,34 @@ def get_active_products_for_reception():
         }
         for p in products
     ]
+
+
+def has_product_movements(product_id):
+    from app.models.harvest_entry import HarvestEntry
+    return (
+        db.session.query(HarvestEntry.id)
+        .filter(HarvestEntry.product_id == product_id)
+        .first()
+        is not None
+    )
+
+
+def delete_product(product_id):
+    product = db.session.get(Product, product_id)
+    if product is None:
+        return None, "not_found"
+
+    if product.active:
+        return None, "active"
+
+    if has_product_movements(product_id):
+        return None, "has_movements"
+
+    db.session.delete(product)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return None, "integrity_error"
+
+    return product, "deleted"

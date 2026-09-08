@@ -228,6 +228,11 @@ const emailSection = document.getElementById("email-section");
 const emailInput = document.getElementById("email-input");
 const sendEmailBtn = document.getElementById("send-email-btn");
 const emailMessage = document.getElementById("email-message");
+const EXPORT_EMAIL_STORAGE_KEY = "inventory.exportRecipientEmail";
+
+if (emailInput) {
+    emailInput.value = localStorage.getItem(EXPORT_EMAIL_STORAGE_KEY) || "";
+}
 
 if (emailSection) {
     emailSection.hidden = false;
@@ -297,7 +302,7 @@ if (sendEmailBtn) {
             }
 
             showEmailMessage(result.message || "Correo enviado exitosamente.", false);
-            emailInput.value = "";
+            localStorage.setItem(EXPORT_EMAIL_STORAGE_KEY, email);
 
         } catch (error) {
             showEmailMessage("No fue posible enviar el correo. Intente nuevamente.", true);

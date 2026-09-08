@@ -152,7 +152,9 @@ class TestEmailMessageHandling:
         assert "emailMessage.textContent" in js
         assert "emailMessage.innerHTML" not in js
 
-    def test_email_input_not_cleared_on_error(self, client):
+    def test_email_recipient_is_preserved_in_browser(self, client):
         resp = client.get("/static/js/reports.js")
         js = resp.data.decode()
-        assert js.count("emailInput.value = \"\"") == 1
+        assert 'localStorage.getItem(EXPORT_EMAIL_STORAGE_KEY)' in js
+        assert 'localStorage.setItem(EXPORT_EMAIL_STORAGE_KEY, email)' in js
+        assert 'emailInput.value = ""' not in js

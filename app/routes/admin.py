@@ -1,8 +1,10 @@
 import secrets
+import re
+import smtplib
 from datetime import datetime, timezone
 from functools import wraps
 
-from flask import Blueprint, Response, jsonify, session, request
+from flask import Blueprint, Response, current_app, jsonify, session, request
 from werkzeug.security import check_password_hash
 
 from app.extensions import db
@@ -14,11 +16,13 @@ from app.services.admin_service import (
 )
 from app.services.backup_service import create_backup, list_backups
 from app.services.export_service import generate_credentials_export
+from app.services.email_service import SMTPConfigError, send_export_email
 from app.services.product_service import (
     DuplicateProductError,
     activate_product,
     create_product,
     deactivate_product,
+    delete_product,
     search_products,
     serialize_product,
     update_product,
@@ -38,6 +42,22 @@ from app.models.worker_assignment import WorkerAssignment
 admin_bp = Blueprint("admin", __name__)
 
 ADMIN_MUTATING_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
+
+_EMAIL_RE = re.compile(
+    r"^[a-zA-Z0-9][a-zA-Z0-9._%+\-]*"
+    r"@[a-zA-Z0-9][a-zA-Z0-9.\-]*\.[a-zA-Z]{2,}$"
+)
+
+
+def _validate_export_email(value):
+    if not isinstance(value, str):
+        return None
+    email = value.strip()
+    if not email or len(email) > 254:
+        return None
+    if any(char in email for char in ("\r", "\n", " ", "\t", ",", ";", "<", ">")):
+        return None
+    return email if _EMAIL_RE.fullmatch(email) else None
 
 
 def require_admin(f):
@@ -101,7 +121,12 @@ def login():
 @require_csrf
 def logout():
     session.clear()
-    return jsonify({"message": "Logged out"})
+    response = jsonify({"message": "Logged out"})
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["Clear-Site-Data"] = '"cache"'
+    return response
 
 
 @admin_bp.get("/api/admin/worker-slots")
@@ -203,6 +228,31 @@ def export_worker_slots():
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
+
+
+@admin_bp.post("/api/admin/worker-slots/export/email")
+@require_admin
+@require_csrf
+def email_worker_slots_export():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "El cuerpo debe ser un objeto JSON."}), 400
+    if set(data) - {"email"}:
+        return jsonify({"error": "La solicitud contiene campos no permitidos."}), 400
+
+    email = _validate_export_email(data.get("email"))
+    if email is None:
+        return jsonify({"error": "Correo inválido."}), 400
+
+    xlsx_bytes, filename = generate_credentials_export()
+    try:
+        send_export_email(email, filename, xlsx_bytes, current_app.config)
+    except SMTPConfigError as exc:
+        return jsonify({"error": f"SMTP no configurado: {exc}"}), 503
+    except (smtplib.SMTPException, OSError):
+        return jsonify({"error": "Error de conexión SMTP."}), 502
+
+    return jsonify({"message": "Correo enviado exitosamente."})
 
 
 @admin_bp.get("/api/admin/products")
@@ -308,6 +358,33 @@ def deactivate_product_endpoint(product_id):
     if product is None:
         return jsonify({"error": "Product not found"}), 404
     return jsonify(serialize_product(product)), 200
+
+
+@admin_bp.delete("/api/admin/products/<int:product_id>")
+@require_admin
+@require_csrf
+def delete_product_endpoint(product_id):
+    product, status = delete_product(product_id)
+
+    if status == "not_found":
+        return jsonify({"error": "Producto no encontrado"}), 404
+
+    if status == "active":
+        return jsonify({
+            "error": "No se puede eliminar un producto activo. Desactívelo primero."
+        }), 409
+
+    if status == "has_movements":
+        return jsonify({
+            "error": "No se puede eliminar este producto porque tiene movimientos hist\u00f3ricos."
+        }), 409
+
+    if status == "integrity_error":
+        return jsonify({
+            "error": "No se pudo eliminar el producto por un error de integridad."
+        }), 409
+
+    return jsonify({"message": "Producto eliminado correctamente"}), 200
 
 
 @admin_bp.get("/api/admin/harvest-entries")

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuracion Inicial - Inventory System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
+    <style>
+        .setup-wrapper {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .setup-card {
+            background: var(--brand-white);
+            border: 1px solid var(--brand-border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .setup-card__title {
+            font-size: 1.25rem;
+            color: var(--brand-green-dark);
+            margin-bottom: 1rem;
+        }
+        .form__row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        @media (max-width: 600px) {
+            .form__row { grid-template-columns: 1fr; }
+        }
+        .form__hint {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        .form__message--success {
+            color: var(--brand-green);
+            background: var(--brand-soft-green);
+            border: 1px solid var(--brand-green);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+        .form__message--error {
+            color: #c00;
+            background: #fee;
+            border: 1px solid #c00;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="admin-wrapper">
+        <header class="admin-header">
+            <div class="brand-header">
+                <img class="brand-logo brand-logo--compact"
+                    src="{{ url_for('static', filename='img/branding/logo-agricola-vita-santa-fe.png') }}"
+                    alt="Agricola Vita Santa Fe">
+                <h1 class="admin-header__title">Configuracion Inicial</h1>
+            </div>
+        </header>
+
+        <div class="setup-wrapper">
+            <div class="setup-card">
+                <h2 class="setup-card__title">Bienvenido al Sistema de Inventario</h2>
+                <p>Complete los datos para iniciar la aplicacion por primera vez.</p>
+                <p class="form__hint">La contrasena del administrador es requerida para acceder al panel de control.</p>
+            </div>
+
+            <form id="setup-form" class="setup-card" autocomplete="off">
+                <a class="admin-home-link" href="/" aria-label="Volver al inicio">
+                    <span class="admin-home-link__icon" aria-hidden="true">⌂</span>
+                    <span>Volver al inicio</span>
+                </a>
+                <h2 class="setup-card__title">1. Contrasena del administrador</h2>
+                <div class="form__group">
+                    <label class="form__label" for="admin-password">Contrasena</label>
+                    <input class="form__input" type="password" id="admin-password" required minlength="8"
+                        placeholder="Minimo 8 caracteres" autocomplete="new-password">
+                    <p class="form__hint">Guardela en un lugar seguro. No se podra recuperar.</p>
+                </div>
+
+                <h2 class="setup-card__title">2. Servidor</h2>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="app-port">Puerto</label>
+                        <input class="form__input" type="number" id="app-port" value="5000" min="1" max="65535">
+                        <p class="form__hint">Default: 5000</p>
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="app-access">Acceso</label>
+                        <select class="form__input" id="app-access">
+                            <option value="local" selected>Solo esta computadora (127.0.0.1)</option>
+                            <option value="network">Red local (0.0.0.0)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h2 class="setup-card__title">3. Zona horaria</h2>
+                <div class="form__group">
+                    <label class="form__label" for="timezone">Zona horaria</label>
+                    <select class="form__input" id="timezone">
+                        <option value="America/Chihuahua" selected>America/Chihuahua</option>
+                        <option value="America/Mexico_City">America/Mexico_City</option>
+                        <option value="America/Monterrey">America/Monterrey</option>
+                        <option value="UTC">UTC</option>
+                    </select>
+                </div>
+
+                <h2 class="setup-card__title">4. Correo SMTP (opcional)</h2>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="smtp-host">Servidor SMTP</label>
+                        <input class="form__input" type="text" id="smtp-host" placeholder="smtp.gmail.com">
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="smtp-port">Puerto SMTP</label>
+                        <input class="form__input" type="number" id="smtp-port" value="587">
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="smtp-user">Correo electronico</label>
+                        <input class="form__input" type="text" id="smtp-user" placeholder="correo@gmail.com">
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="smtp-pass">Contrasena de aplicacion</label>
+                        <input class="form__input" type="password" id="smtp-pass" placeholder="Opcional">
+                    </div>
+                </div>
+
+                <div id="setup-message" hidden></div>
+
+                <button class="form__button" type="submit" id="setup-submit" style="margin-top:1rem;">
+                    Guardar configuracion
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const setupForm = document.getElementById("setup-form");
+        const setupMessage = document.getElementById("setup-message");
+        const setupSubmit = document.getElementById("setup-submit");
+
+        setupForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            setupSubmit.disabled = true;
+            setupSubmit.textContent = "Guardando...";
+
+            const data = {
+                admin_password: document.getElementById("admin-password").value,
+                app_port: document.getElementById("app-port").value,
+                app_access: document.getElementById("app-access").value,
+                harvest_timezone: document.getElementById("timezone").value,
+                smtp_host: document.getElementById("smtp-host").value.trim(),
+                smtp_port: document.getElementById("smtp-port").value,
+                smtp_username: document.getElementById("smtp-user").value.trim(),
+                smtp_app_password: document.getElementById("smtp-pass").value,
+            };
+
+            try {
+                const response = await fetch("/api/setup", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || "Error al guardar");
+                }
+
+                setupMessage.textContent = "Configuracion guardada. Redirigiendo al login...";
+                setupMessage.className = "form__message form__message--success";
+                setupMessage.hidden = false;
+                setupSubmit.disabled = true;
+                setupSubmit.textContent = "Configuracion guardada";
+
+                setTimeout(() => {
+                    window.location.href = result.redirect || "/admin/login";
+                }, 2000);
+
+            } catch (error) {
+                setupMessage.textContent = error.message;
+                setupMessage.className = "form__message form__message--error";
+                setupMessage.hidden = false;
+                setupSubmit.disabled = false;
+                setupSubmit.textContent = "Guardar configuracion";
+            }
+        });
+    </script>
+</body>
+
+</html>

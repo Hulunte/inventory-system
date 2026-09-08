@@ -118,8 +118,15 @@ def send_export_email(recipient, filename, xlsx_bytes, app_config):
 
     cfg = _build_config(app_config)
 
-    if not cfg["username"] or not cfg["app_password"]:
-        raise SMTPConfigError("SMTP configuration is incomplete")
+    required = {
+        "MAIL_SMTP_HOST": cfg["host"],
+        "MAIL_SMTP_USERNAME": cfg["username"],
+        "MAIL_SMTP_APP_PASSWORD": cfg["app_password"],
+        "MAIL_FROM_ADDRESS": cfg["from_address"],
+    }
+    for variable, value in required.items():
+        if not value or not str(value).strip():
+            raise SMTPConfigError(f"Falta la variable {variable}")
 
     safe_filename = _sanitize_filename(filename)
     msg = _build_message(recipient, safe_filename, xlsx_bytes, cfg)

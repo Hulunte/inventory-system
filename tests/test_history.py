@@ -248,7 +248,7 @@ class TestWorkerEntries:
 
 
 class TestHistoryEndpoints:
-    def test_daily_summary_endpoint(self, client, db_session, app):
+    def test_daily_summary_endpoint(self, admin_client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
             from datetime import time as dt_time
@@ -262,7 +262,7 @@ class TestHistoryEndpoints:
             _make_entry(db_session, w, a, Decimal("4.500"), utc_now + timedelta(hours=9))
             db_session.commit()
 
-            response = client.get(f"/api/history/daily?date={today.isoformat()}&q=Endpoint+Worker+Unique")
+            response = admin_client.get(f"/api/history/daily?date={today.isoformat()}&q=Endpoint+Worker+Unique")
             assert response.status_code == 200
             data = response.get_json()
             assert data["date"] == today.isoformat()
@@ -270,21 +270,21 @@ class TestHistoryEndpoints:
             assert data["summary"]["total_weight_kg"] == "4.500"
             assert len(data["workers"]) == 1
 
-    def test_daily_summary_invalid_date_endpoint(self, client, db_session):
-        response = client.get("/api/history/daily?date=2026-13-45")
+    def test_daily_summary_invalid_date_endpoint(self, admin_client, db_session):
+        response = admin_client.get("/api/history/daily?date=2026-13-45")
         assert response.status_code == 400
         data = response.get_json()
         assert "error" in data
 
-    def test_daily_summary_empty_date_endpoint(self, client, db_session):
-        response = client.get("/api/history/daily?date=2099-01-01")
+    def test_daily_summary_empty_date_endpoint(self, admin_client, db_session):
+        response = admin_client.get("/api/history/daily?date=2099-01-01")
         assert response.status_code == 200
         data = response.get_json()
         assert data["workers"] == []
         assert data["summary"]["total_entries"] == 0
         assert data["summary"]["total_weight_kg"] == "0.000"
 
-    def test_worker_entries_endpoint(self, client, db_session, app):
+    def test_worker_entries_endpoint(self, admin_client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
             from datetime import time as dt_time
@@ -298,7 +298,7 @@ class TestHistoryEndpoints:
             _make_entry(db_session, w, a, Decimal("2.500"), utc_now + timedelta(hours=10))
             db_session.commit()
 
-            response = client.get(
+            response = admin_client.get(
                 f"/api/history/assignments/{a.id}/entries?date={today.isoformat()}"
             )
             assert response.status_code == 200
@@ -309,20 +309,20 @@ class TestHistoryEndpoints:
             assert data["summary"]["entries_count"] == 1
             assert data["summary"]["total_weight_kg"] == "2.500"
 
-    def test_worker_entries_nonexistent_worker_endpoint(self, client, db_session):
-        response = client.get("/api/history/assignments/99999/entries?date=2026-08-31")
+    def test_worker_entries_nonexistent_worker_endpoint(self, admin_client, db_session):
+        response = admin_client.get("/api/history/assignments/99999/entries?date=2026-08-31")
         assert response.status_code == 404
         data = response.get_json()
         assert "error" in data
 
-    def test_worker_entries_no_entries_on_date(self, client, db_session, app):
+    def test_worker_entries_no_entries_on_date(self, admin_client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
             from datetime import date
 
             w, a = make_worker_with_assignment(db_session, None, name="No Entries Endpoint Unique")
 
-            response = client.get(
+            response = admin_client.get(
                 f"/api/history/assignments/{a.id}/entries?date=2099-01-01"
             )
             assert response.status_code == 200
@@ -331,17 +331,17 @@ class TestHistoryEndpoints:
             assert data["summary"]["entries_count"] == 0
             assert data["summary"]["total_weight_kg"] == "0.000"
 
-    def test_worker_entries_invalid_date_endpoint(self, client, db_session, app):
+    def test_worker_entries_invalid_date_endpoint(self, admin_client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
             w, a = make_worker_with_assignment(db_session, None, name="Invalid Date Endpoint Unique")
 
-            response = client.get(
+            response = admin_client.get(
                 f"/api/history/assignments/{a.id}/entries?date=not-a-date"
             )
             assert response.status_code == 400
 
-    def test_worker_entries_time_in_timezone(self, client, db_session, app):
+    def test_worker_entries_time_in_timezone(self, admin_client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
             from datetime import time as dt_time
@@ -355,7 +355,7 @@ class TestHistoryEndpoints:
             _make_entry(db_session, w, a, Decimal("1.000"), utc_14)
             db_session.commit()
 
-            response = client.get(
+            response = admin_client.get(
                 f"/api/history/assignments/{a.id}/entries?date={today.isoformat()}"
             )
             data = response.get_json()
@@ -363,9 +363,9 @@ class TestHistoryEndpoints:
 
 
 class TestHistoryPageOperationalToday:
-    def test_history_page_operational_today(self, client, monkeypatch):
+    def test_history_page_operational_today(self, admin_client, monkeypatch):
         monkeypatch.setattr("app.routes.views._operational_today", lambda: date(2026, 6, 17))
-        response = client.get("/history")
+        response = admin_client.get("/history")
         assert response.status_code == 200
         html = response.data.decode()
         assert 'HISTORY_CONFIG' in html

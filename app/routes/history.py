@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, session
 
 from app.extensions import db
 from app.models.worker import Worker
@@ -13,6 +13,13 @@ from app.services.history_service import (
 )
 
 history_bp = Blueprint("history", __name__)
+
+
+@history_bp.before_request
+def require_history_admin():
+    if not session.get("admin"):
+        return jsonify({"error": "Admin authentication required"}), 401
+    return None
 
 
 @history_bp.get("/api/history/daily")

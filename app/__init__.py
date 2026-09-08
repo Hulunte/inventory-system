@@ -3,7 +3,7 @@ import os
 import sys
 import time
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 from config import Config
 from app.extensions import db, migrate
@@ -65,6 +65,15 @@ def create_app(config_class=None):
     app.register_blueprint(views_bp)
 
     _register_error_handlers(app)
+
+    @app.after_request
+    def prevent_admin_content_caching(response):
+        protected_paths = ("/history", "/reports", "/api/history/", "/api/reports/")
+        if request.path in protected_paths[:2] or request.path.startswith(protected_paths[2:]):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
 
     @app.get("/api/health")
     def health():
