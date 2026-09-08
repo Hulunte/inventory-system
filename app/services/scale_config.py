@@ -13,7 +13,9 @@ DEFAULT_PARITY = "N"
 DEFAULT_STOPBITS = 1
 DEFAULT_TIMEOUT_SECONDS = 1.0
 DEFAULT_LINE_ENCODING = "ascii"
-DEFAULT_PROFILE = "auto"
+DEFAULT_PROFILE = "generic"
+DEFAULT_TERMINATOR = "CR"
+DEFAULT_HANDSHAKE = "none"
 DEFAULT_MIN_WEIGHT_KG = "0.001"
 DEFAULT_MAX_WEIGHT_KG = "999.999"
 
@@ -33,6 +35,8 @@ class ScaleConfig:
     profile: str
     min_weight_kg: str
     max_weight_kg: str
+    terminator: str = DEFAULT_TERMINATOR
+    handshake: str = DEFAULT_HANDSHAKE
 
     @property
     def parity_int(self):
@@ -93,6 +97,13 @@ def load_scale_config() -> ScaleConfig:
     if profile not in VALID_PROFILES:
         raise ValueError(f"SCALE_PROFILE invalid: {profile}. Use one of {VALID_PROFILES}")
 
+    terminator = os.getenv("SCALE_TERMINATOR", DEFAULT_TERMINATOR).strip().upper()
+    if terminator not in {"CR", "LF", "CRLF"}:
+        raise ValueError("SCALE_TERMINATOR invalid: use CR, LF, or CRLF")
+    handshake = os.getenv("SCALE_HANDSHAKE", DEFAULT_HANDSHAKE).strip().lower()
+    if handshake != "none":
+        raise ValueError("SCALE_HANDSHAKE invalid: only none is supported")
+
     min_weight = os.getenv("SCALE_MIN_WEIGHT_KG", DEFAULT_MIN_WEIGHT_KG).strip()
     max_weight = os.getenv("SCALE_MAX_WEIGHT_KG", DEFAULT_MAX_WEIGHT_KG).strip()
     _validate_weight_range(min_weight, max_weight)
@@ -106,6 +117,8 @@ def load_scale_config() -> ScaleConfig:
         timeout_seconds=timeout_seconds,
         line_encoding=line_encoding,
         profile=profile,
+        terminator=terminator,
+        handshake=handshake,
         min_weight_kg=min_weight,
         max_weight_kg=max_weight,
     )

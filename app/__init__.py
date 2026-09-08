@@ -53,6 +53,7 @@ def create_app(config_class=None):
     from app.routes.reports import reports_bp
     from app.routes.tickets import tickets_bp
     from app.routes.scale import scale_bp
+    from app.routes.voids import voids_bp
     from app.routes.views import views_bp
 
     app.register_blueprint(workers_bp)
@@ -62,6 +63,7 @@ def create_app(config_class=None):
     app.register_blueprint(reports_bp)
     app.register_blueprint(tickets_bp)
     app.register_blueprint(scale_bp)
+    app.register_blueprint(voids_bp)
     app.register_blueprint(views_bp)
 
     _register_error_handlers(app)

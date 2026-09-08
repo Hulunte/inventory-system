@@ -23,6 +23,7 @@ def get_worker_by_barcode(barcode):
             "slot_number": worker.slot_number,
             "slot_label": worker.slot_label,
             "has_assignment": assignment is not None,
-            "person_name": assignment.person_name if assignment else None,
+            "can_register_anonymous": assignment is None,
+            "person_name": assignment.person_name if assignment else "Sin nombre",
         }
     )

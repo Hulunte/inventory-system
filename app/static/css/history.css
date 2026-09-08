@@ -164,6 +164,10 @@ body {
     font-size: 0.9rem;
 }
 
+.table-scroll {
+    overflow-x: auto;
+}
+
 .summary-table th,
 .detail-table th {
     text-align: left;

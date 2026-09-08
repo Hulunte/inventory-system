@@ -228,3 +228,14 @@ def reports_page():
         previous_week_start=monday_previous.isoformat(),
         previous_week_end=sunday_previous.isoformat(),
     )
+
+
+@views_bp.get("/anulaciones")
+def voids_page():
+    if not session.get("admin"):
+        return redirect(url_for("views.admin_login_page"))
+    return render_template(
+        "voids.html",
+        csrf_token=session.get("csrf_token", ""),
+        operational_today=_operational_today().isoformat(),
+    )

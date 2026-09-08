@@ -4,6 +4,7 @@ const productButtonsContainer = document.getElementById("product-buttons");
 const productWarning = document.getElementById("product-warning");
 const movementsContent = document.getElementById("movements-content");
 const refreshMovementsBtn = document.getElementById("refresh-movements");
+const recentMovementsSection = document.getElementById("recent-movements");
 
 const STORAGE_KEY = "inventory.selectedProductId";
 const SCANNER_DEBUG = new URLSearchParams(window.location.search)
@@ -263,18 +264,6 @@ barcodeInput.addEventListener("keydown", async (event) => {
 
         const worker = await response.json();
 
-        if (!worker.has_assignment) {
-            productInfo.innerHTML = `
-                <div class="status-message status-message--error">
-                    <p><strong>${escapeHtml(worker.slot_label)} — Sin asignar</strong></p>
-                    <p>Código: ${escapeHtml(worker.barcode)}</p>
-                    <p>Este cupo no tiene una persona asignada. Contacte al administrador.</p>
-                </div>
-            `;
-            await restoreBarcodePosition(initialScrollTop);
-            return;
-        }
-
         scannerDebug("trabajador validado");
         barcodeInput.blur();
         await showWorker(worker);
@@ -307,7 +296,7 @@ async function showWorker(worker) {
         productInfo.innerHTML = `
             <div class="worker-card">
                 <h2 class="worker-card__slot">${escapeHtml(daily.worker.slot_label)}</h2>
-                <h3 class="worker-card__name">${escapeHtml(daily.worker.name || "")}</h3>
+                <h3 class="worker-card__name">${escapeHtml(daily.worker.name || "Sin nombre")}</h3>
 
                 <div class="worker-card__details">
                     <div class="worker-card__detail">
@@ -414,17 +403,6 @@ async function showWorker(worker) {
                         });
                         return;
                     }
-                    if (result.code === "worker_unassigned") {
-                        productInfo.innerHTML = `
-                            <div class="status-message status-message--error">
-                                <p><strong>${escapeHtml(daily.worker.slot_label)} — Sin asignar</strong></p>
-                                <p>Código: ${escapeHtml(daily.worker.barcode)}</p>
-                                <p>Este cupo no tiene una persona asignada. Contacte al administrador.</p>
-                            </div>
-                        `;
-                        barcodeInput.select();
-                        return;
-                    }
                     throw new Error(result.error || "No fue posible registrar la pesada");
                 }
 
@@ -454,9 +432,7 @@ async function showWorker(worker) {
                 `;
 
                 barcodeInput.value = "";
-                barcodeInput.focus();
-
-                loadRecentMovements();
+                await showRecentMovementAfterRegistration();
 
             } catch (error) {
                 console.error(error);
@@ -533,8 +509,9 @@ async function loadRecentMovements() {
                 <div class="movement ${statusClass}">
                     <div class="movement__row">
                         <span class="movement__time">${escapeHtml(m.time)}</span>
-                        <span class="movement__worker">${slotLabel}${escapeHtml(m.worker.name || "")} (${escapeHtml(m.worker.barcode || "")})</span>
+                        <span class="movement__worker">${slotLabel}${escapeHtml(m.worker.name || "Sin nombre")} (${escapeHtml(m.worker.barcode || "")})</span>
                         <span class="movement__badge movement__badge--${m.voided ? "voided" : "active"}">${escapeHtml(statusLabel)}</span>
+                        ${m.can_void && !m.voided ? `<button type="button" class="movement__void-btn" data-void-entry-id="${m.id}">Anular</button>` : ""}
                     </div>
                     <div class="movement__row movement__details">
                         <span class="movement__product">${productName}</span>
@@ -562,6 +539,47 @@ async function loadRecentMovements() {
         refreshMovementsBtn.disabled = false;
     }
 }
+
+async function showRecentMovementAfterRegistration() {
+    await loadRecentMovements();
+    recentMovementsSection.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+    });
+    barcodeInput.focus({preventScroll: true});
+}
+
+movementsContent.addEventListener("click", async event => {
+    const button = event.target.closest("[data-void-entry-id]");
+    if (!button) return;
+    if (!window.confirm("¿Confirma la anulación inmediata de este movimiento?")) return;
+
+    button.disabled = true;
+    try {
+        const sessionResponse = await fetch("/api/admin/session");
+        const sessionData = await sessionResponse.json();
+        if (!sessionData.authenticated) {
+            throw new Error("Se requiere una sesión administrativa activa.");
+        }
+        const response = await fetch(`/api/admin/harvest-entries/${button.dataset.voidEntryId}/void`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": sessionData.csrf_token,
+            },
+            body: JSON.stringify({reason: "Anulación rápida"}),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || "No fue posible anular el movimiento.");
+        }
+        await loadRecentMovements();
+    } catch (error) {
+        alert(error.message);
+        button.disabled = false;
+    }
+});
 
 function startMovementsPolling() {
     stopMovementsPolling();

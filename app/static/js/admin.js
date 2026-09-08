@@ -14,19 +14,8 @@ const assignMessage = document.getElementById("assign-message");
 const assignCancelBtn = document.getElementById("assign-cancel-btn");
 const assignSaveBtn = document.getElementById("assign-save-btn");
 
-const entryDateInput = document.getElementById("entry-date-input");
-const entrySearchInput = document.getElementById("entry-search-input");
-const entriesList = document.getElementById("entries-list");
-const voidModal = document.getElementById("void-modal");
-const voidModalText = document.getElementById("void-modal-text");
-const voidReasonInput = document.getElementById("void-reason-input");
-const voidCancelBtn = document.getElementById("void-cancel-btn");
-const voidConfirmBtn = document.getElementById("void-confirm-btn");
-
 let csrfToken = "";
 let slotSearchTimeout = null;
-let entrySearchTimeout = null;
-let currentVoidEntryId = null;
 const EXPORT_EMAIL_STORAGE_KEY = "inventory.exportRecipientEmail";
 
 function getCsrfToken() {
@@ -353,155 +342,6 @@ if (slotsEmailInput && emailSlotsBtn) {
 }
 
 
-async function loadEntries() {
-    entriesList.innerHTML = `<p class="entries-list__empty">Cargando movimientos...</p>`;
-
-    try {
-        let url = "/api/admin/harvest-entries";
-        const params = [];
-        if (entryDateInput.value) {
-            params.push(`date=${encodeURIComponent(entryDateInput.value)}`);
-        }
-        if (entrySearchInput.value.trim()) {
-            params.push(`q=${encodeURIComponent(entrySearchInput.value.trim())}`);
-        }
-        if (params.length > 0) {
-            url += "?" + params.join("&");
-        }
-
-        const response = await fetch(url);
-
-        if (response.status === 401) {
-            window.location.href = "/admin/login";
-            return;
-        }
-
-        if (!response.ok) {
-            throw new Error("Error al cargar movimientos");
-        }
-
-        const data = await response.json();
-        const entries = data.entries || [];
-
-        if (entries.length === 0) {
-            entriesList.innerHTML = `<p class="entries-list__empty">No se encontraron movimientos.</p>`;
-            return;
-        }
-
-        entriesList.innerHTML = entries.map(renderEntry).join("");
-
-    } catch (error) {
-        entriesList.innerHTML = `<p class="entries-list__empty entries-list__empty--error">${error.message}</p>`;
-    }
-}
-
-function renderEntry(entry) {
-    const statusClass = entry.voided ? "badge--inactive" : "badge--active";
-    const statusText = entry.voided ? "Anulado" : "Activo";
-    const worker = entry.worker;
-    const workerDisplay = `${escapeHtml(worker.slot_label)} — ${escapeHtml(worker.name)} / ${escapeHtml(worker.barcode)}`;
-    const voidInfo = entry.voided
-        ? `<div class="entry-row__void-info">
-               <span class="entry-row__void-reason">Motivo: ${escapeHtml(entry.void_reason)}</span>
-               <span class="entry-row__void-date">Anulado: ${entry.voided_at_local ? escapeHtml(entry.voided_at_local) : ""}</span>
-           </div>`
-        : "";
-    const voidButton = entry.voided
-        ? ""
-        : `<button class="btn btn--danger btn--void" type="button" data-entry-id="${entry.id}"
-               data-worker="${escapeHtml(worker.slot_label)} — ${escapeHtml(worker.name)} / ${escapeHtml(worker.barcode)}"
-               data-weight="${entry.weight_kg}">Anular</button>`;
-
-    return `
-        <div class="entry-row">
-            <div class="entry-row__info">
-                <span class="entry-row__id">#${entry.id}</span>
-                <span class="entry-row__worker">${workerDisplay}</span>
-                <span class="entry-row__weight">${entry.weight_kg} kg</span>
-                <span class="entry-row__time">${entry.created_at_local}</span>
-                <span class="badge ${statusClass}">${statusText}</span>
-            </div>
-            ${voidInfo}
-            ${voidButton}
-        </div>
-    `;
-}
-
-entryDateInput.addEventListener("change", loadEntries);
-
-entrySearchInput.addEventListener("input", () => {
-    clearTimeout(entrySearchTimeout);
-    entrySearchTimeout = setTimeout(loadEntries, 250);
-});
-
-entriesList.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-entry-id]");
-    if (!button) return;
-
-    currentVoidEntryId = button.dataset.entryId;
-    const worker = button.dataset.worker;
-    const weight = button.dataset.weight;
-
-    voidModalText.textContent = `¿Desea anular el movimiento #${currentVoidEntryId} de ${worker} (${weight} kg)?`;
-    voidReasonInput.value = "";
-    voidModal.hidden = false;
-    voidReasonInput.focus();
-});
-
-voidCancelBtn.addEventListener("click", () => {
-    voidModal.hidden = true;
-    currentVoidEntryId = null;
-});
-
-voidModal.addEventListener("click", (event) => {
-    if (event.target === voidModal) {
-        voidModal.hidden = true;
-        currentVoidEntryId = null;
-    }
-});
-
-voidConfirmBtn.addEventListener("click", async () => {
-    const reason = voidReasonInput.value.trim();
-
-    if (!reason) {
-        alert("El motivo de anulación es obligatorio.");
-        return;
-    }
-
-    voidConfirmBtn.disabled = true;
-    voidConfirmBtn.textContent = "Anulando...";
-
-    try {
-        const response = await fetch(`/api/admin/harvest-entries/${currentVoidEntryId}/void`, {
-            method: "PATCH",
-            headers: apiHeaders(),
-            body: JSON.stringify({ reason }),
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.error || "No fue posible anular el movimiento");
-        }
-
-        voidModal.hidden = true;
-        currentVoidEntryId = null;
-        loadEntries();
-
-    } catch (error) {
-        alert(error.message);
-    } finally {
-        voidConfirmBtn.disabled = false;
-        voidConfirmBtn.textContent = "Confirmar anulación";
-    }
-});
-
-
-const todayStr = window.ADMIN_CONFIG ? window.ADMIN_CONFIG.operationalToday : null;
-if (todayStr) {
-    entryDateInput.value = todayStr;
-}
-
 const backupCreateBtn = document.getElementById("backup-create-btn");
 const backupMessage = document.getElementById("backup-message");
 const backupLatest = document.getElementById("backup-latest");
@@ -592,6 +432,5 @@ backupCreateBtn.addEventListener("click", async () => {
 
 initCsrfToken().then(() => {
     loadWorkerSlots();
-    loadEntries();
     loadBackups();
 });

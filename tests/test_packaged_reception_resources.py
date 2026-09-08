@@ -20,6 +20,7 @@ def test_packaged_reception_resources_match_sources_byte_for_byte():
     archive = CArchiveReader(str(EXE_PATH))
     resources = (
         (ROOT / "app" / "static" / "js" / "reception.js", r"app\static\js\reception.js"),
+        (ROOT / "app" / "static" / "css" / "reception.css", r"app\static\css\reception.css"),
         (ROOT / "app" / "templates" / "reception.html", r"app\templates\reception.html"),
     )
 
@@ -33,3 +34,5 @@ def test_packaged_reception_resources_match_sources_byte_for_byte():
     assert b"function findScrollableAncestor(element)" in packaged_js
     assert b"async function scrollToWeightControl(element)" in packaged_js
     assert b"element.focus({ preventScroll: true })" in packaged_js
+    assert b"async function showRecentMovementAfterRegistration()" in packaged_js
+    assert b"recentMovementsSection.scrollIntoView" in packaged_js

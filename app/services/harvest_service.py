@@ -15,6 +15,9 @@ class WorkerUnassignedError(Exception):
     """Raised when a worker has no open assignment."""
 
 
+ANONYMOUS_WORKER_NAME = "Sin nombre"
+
+
 def get_worker_by_barcode(barcode):
     return Worker.query.filter_by(barcode=barcode, active=True).first()
 
@@ -52,7 +55,12 @@ def register_harvest(barcode, weight_kg, product_id):
     )
 
     if open_assignment is None:
-        raise WorkerUnassignedError("worker_unassigned")
+        open_assignment = WorkerAssignment(
+            worker_id=worker.id,
+            person_name=ANONYMOUS_WORKER_NAME,
+        )
+        db.session.add(open_assignment)
+        db.session.flush()
 
     product = (
         Product.query
@@ -81,7 +89,7 @@ def register_harvest(barcode, weight_kg, product_id):
         worker_assignment_id=open_assignment.id,
         worker_slot_number_snapshot=worker.slot_number,
         worker_barcode_snapshot=worker.barcode,
-        worker_name_snapshot=open_assignment.person_name,
+        worker_name_snapshot=open_assignment.person_name or ANONYMOUS_WORKER_NAME,
     )
 
     db.session.add(entry)
@@ -92,6 +100,8 @@ def register_harvest(barcode, weight_kg, product_id):
 
 
 def get_daily_total(assignment_id, operational_date=None, tz=None):
+    if assignment_id is None:
+        return Decimal("0")
     if operational_date is None:
         if tz is None:
             from flask import current_app
@@ -127,7 +137,7 @@ def get_all_entries():
     )
 
 
-def get_recent_movements(limit=10):
+def get_recent_movements(limit=10, can_void=False):
     from flask import current_app
     tz = current_app.config["HARVEST_TIMEZONE"]
 
@@ -153,7 +163,7 @@ def get_recent_movements(limit=10):
             "id": entry.id,
             "time": local_time,
             "worker": {
-                "name": entry.worker_name_snapshot,
+                "name": entry.worker_name_snapshot or ANONYMOUS_WORKER_NAME,
                 "barcode": entry.worker_barcode_snapshot,
                 "slot_number": slot_num,
                 "slot_label": f"Trabajador {slot_num:03d}" if slot_num is not None else None,
@@ -172,6 +182,7 @@ def get_recent_movements(limit=10):
                 else None
             ),
             "voided": entry.voided,
+            "can_void": bool(can_void),
         })
 
     return movements

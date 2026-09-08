@@ -201,15 +201,14 @@ class TestExcelSeparatesAssignments:
         assert row[4] == w.barcode
 
 
-class TestRegisterNoMovementWithoutAssignment:
-    def test_unassigned_worker_returns_error(self, db_session, app):
-        w = make_worker(db_session, name="Unassigned")
+class TestRegisterWithoutNamedAssignment:
+    def test_unassigned_slot_registers_as_unnamed(self, db_session, app):
+        w = make_worker(db_session, name=None)
+        product = _ensure_product(db_session)
+        entry, _ = register_harvest(w.barcode, Decimal("5.000"), product.id)
 
-        with pytest.raises(WorkerUnassignedError):
-            register_harvest(w.barcode, Decimal("5.000"), product_id=1)
-
-        entries = HarvestEntry.query.filter_by(worker_id=w.id).all()
-        assert len(entries) == 0
+        assert entry.worker_name_snapshot == "Sin nombre"
+        assert entry.worker_assignment_id is not None
 
 
 class TestAdminNoNPlusOne:

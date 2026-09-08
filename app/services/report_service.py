@@ -57,6 +57,7 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
             HarvestEntry.worker_barcode_snapshot,
             func.count(HarvestEntry.id).label("entries_count"),
             func.coalesce(func.sum(HarvestEntry.weight_kg), 0).label("total_weight_kg"),
+            func.coalesce(func.sum(HarvestEntry.amount_mxn), 0).label("total_amount_mxn"),
         )
         .filter(
             HarvestEntry.created_at >= start_utc,
@@ -86,10 +87,12 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
     workers_data = []
     total_entries = 0
     total_weight = Decimal("0.000")
+    total_amount = Decimal("0.00")
 
     for r in rows:
         worker_weight = Decimal(str(r.total_weight_kg))
         worker_weight_formatted = _format_decimal(worker_weight)
+        worker_amount = Decimal(str(r.total_amount_mxn))
 
         slot_num = r.worker_slot_number_snapshot
         slot_label = f"Trabajador {slot_num:03d}" if slot_num else None
@@ -103,10 +106,12 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
                 "barcode": r.worker_barcode_snapshot,
                 "entries_count": r.entries_count,
                 "total_weight_kg": worker_weight_formatted,
+                "total_amount_mxn": str(worker_amount.quantize(Decimal("0.01"))),
             }
         )
         total_entries += r.entries_count
         total_weight += worker_weight
+        total_amount += worker_amount
 
     return {
         "workers": workers_data,
@@ -114,5 +119,6 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
             "total_workers": len(workers_data),
             "total_entries": total_entries,
             "total_weight_kg": _format_decimal(total_weight),
+            "total_amount_mxn": str(total_amount.quantize(Decimal("0.01"))),
         },
     }

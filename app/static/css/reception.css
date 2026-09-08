@@ -552,6 +552,10 @@ body {
     gap: 0.5rem;
 }
 
+.recent-movements {
+    scroll-margin-block: 1rem;
+}
+
 .movement {
     border: 1px solid var(--clr-border);
     border-radius: var(--radius-sm);
@@ -609,6 +613,26 @@ body {
     border: 1px solid var(--clr-error-border);
 }
 
+.movement__void-btn {
+    border: 1px solid var(--clr-error);
+    border-radius: 4px;
+    background: var(--clr-error);
+    color: #fff;
+    padding: 0.3rem 0.65rem;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.movement__void-btn:hover:not(:disabled) {
+    filter: brightness(0.92);
+}
+
+.movement__void-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
 .movement__details {
     margin-top: 0.35rem;
     font-size: 0.8rem;
@@ -630,6 +654,23 @@ body {
 }
 
 @media (max-width: 480px) {
+    .recent-movements {
+        padding: 0.75rem;
+    }
+
+    .recent-movements .movements-list {
+        max-height: 13rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .recent-movements__header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--clr-surface);
+    }
+
     .movement__row {
         flex-direction: column;
         align-items: flex-start;
@@ -638,6 +679,11 @@ body {
 
     .movement__badge {
         margin-left: 0;
+    }
+
+    .movement__void-btn {
+        width: 100%;
+        margin-top: 0.25rem;
     }
 
     .movement__details {

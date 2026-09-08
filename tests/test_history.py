@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.models.harvest_entry import HarvestEntry
+from app.models.worker_assignment import WorkerAssignment
 from app.services.history_service import (
     get_daily_summary,
     get_worker_entries,
@@ -248,6 +249,49 @@ class TestWorkerEntries:
 
 
 class TestHistoryEndpoints:
+    def test_detail_uses_assignment_id_for_two_assignments_in_same_slot(
+        self, admin_client, db_session, app
+    ):
+        tz = app.config["HARVEST_TIMEZONE"]
+        local_start = datetime(2026, 9, 5, tzinfo=tz)
+        worker, old_assignment = make_worker_with_assignment(
+            db_session, name="Trabajador anterior septiembre"
+        )
+        old_assignment.started_at = local_start.astimezone(timezone.utc) - timedelta(days=10)
+        old_assignment.ended_at = local_start.astimezone(timezone.utc) + timedelta(hours=12)
+        new_assignment = WorkerAssignment(
+            worker_id=worker.id,
+            person_name="Trabajador nuevo septiembre",
+            started_at=local_start.astimezone(timezone.utc) + timedelta(days=1),
+        )
+        db_session.add(new_assignment)
+        db_session.flush()
+
+        _make_entry(
+            db_session, worker, old_assignment, Decimal("4.250"),
+            local_start.astimezone(timezone.utc) + timedelta(hours=8),
+        )
+        new_date = local_start + timedelta(days=1)
+        _make_entry(
+            db_session, worker, new_assignment, Decimal("7.500"),
+            new_date.astimezone(timezone.utc) + timedelta(hours=9),
+        )
+        db_session.commit()
+
+        old_response = admin_client.get(
+            f"/api/history/assignments/{old_assignment.id}/entries?date=2026-09-05"
+        )
+        new_response = admin_client.get(
+            f"/api/history/assignments/{new_assignment.id}/entries?date=2026-09-06"
+        )
+
+        assert old_response.status_code == 200
+        assert old_response.get_json()["worker"]["name"] == "Trabajador anterior septiembre"
+        assert old_response.get_json()["entries"][0]["weight_kg"] == "4.250"
+        assert new_response.status_code == 200
+        assert new_response.get_json()["worker"]["name"] == "Trabajador nuevo septiembre"
+        assert new_response.get_json()["entries"][0]["weight_kg"] == "7.500"
+
     def test_daily_summary_endpoint(self, admin_client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
@@ -370,3 +414,10 @@ class TestHistoryPageOperationalToday:
         html = response.data.decode()
         assert 'HISTORY_CONFIG' in html
         assert 'operationalToday: "2026-06-17"' in html
+
+    def test_history_frontend_sends_worker_assignment_id(self, client):
+        source = client.get("/static/js/history.js").get_data(as_text=True)
+        assert 'data-assignment-id="${w.worker_assignment_id}"' in source
+        assert "row.dataset.assignmentId" in source
+        assert "/api/history/assignments/${assignmentId}/entries" in source
+        assert "data-worker-id" not in source

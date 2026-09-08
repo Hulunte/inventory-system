@@ -34,7 +34,7 @@ def test_successful_worker_flow_scrolls_real_weight_control():
 
 def test_reception_template_versions_scanner_javascript():
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    assert "filename='js/reception.js', v='20260907-8'" in template
+    assert "filename='js/reception.js', v='20260908-1'" in template
 
 
 def test_successful_worker_flow_focuses_weight_control():
@@ -95,17 +95,13 @@ def test_invalid_barcode_returns_before_scroll():
     assert "scrollIntoView" not in not_found
 
 
-def test_unassigned_worker_returns_before_scroll():
+def test_unassigned_worker_continues_to_weight_as_anonymous():
     script = _script()
     handler = script.split('barcodeInput.addEventListener("keydown"', 1)[1].split(
         "async function showWorker", 1
     )[0]
-    unassigned = handler.split("if (!worker.has_assignment)", 1)[1].split(
-        "await showWorker(worker)", 1
-    )[0]
-    assert "return;" in unassigned
-    assert "focusNextHarvestControl" not in unassigned
-    assert "scrollIntoView" not in unassigned
+    assert "if (!worker.has_assignment)" not in handler
+    assert "await showWorker(worker)" in handler
 
 
 def test_manual_capture_and_registration_behavior_remains_available():
@@ -115,3 +111,19 @@ def test_manual_capture_and_registration_behavior_remains_available():
     assert "registerButton.click()" in script
     assert 'registerButton.addEventListener("click"' in script
     assert 'fetch("/api/harvest/entries"' in script
+
+
+def test_successful_registration_reveals_preview_and_preserves_scanner_focus():
+    script = _script()
+    success_flow = script.split('barcodeInput.value = ""', 1)[1].split(
+        "} catch (error)", 1
+    )[0]
+    assert "await showRecentMovementAfterRegistration()" in success_flow
+    helper = script.split("async function showRecentMovementAfterRegistration()", 1)[1].split(
+        "movementsContent.addEventListener", 1
+    )[0]
+    assert "await loadRecentMovements()" in helper
+    assert "recentMovementsSection.scrollIntoView" in helper
+    assert 'behavior: "smooth"' in helper
+    assert 'block: "center"' in helper
+    assert "barcodeInput.focus({preventScroll: true})" in helper
