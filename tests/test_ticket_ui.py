@@ -119,13 +119,13 @@ class TestNavigationAllPages:
         html = resp.data.decode()
         assert 'href="/tickets"' in html
 
-    def test_history_has_tickets_link(self, client):
-        resp = client.get("/history")
+    def test_history_has_tickets_link(self, admin_client):
+        resp = admin_client.get("/history")
         html = resp.data.decode()
         assert 'href="/tickets"' in html
 
-    def test_reports_has_tickets_link(self, client):
-        resp = client.get("/reports")
+    def test_reports_has_tickets_link(self, admin_client):
+        resp = admin_client.get("/reports")
         html = resp.data.decode()
         assert 'href="/tickets"' in html
 

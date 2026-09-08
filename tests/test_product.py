@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.product import Product
 from app.extensions import db
+from tests.conftest import make_worker_with_assignment
 from app.services.product_service import (
     DuplicateProductError,
     _validate_rate,
@@ -16,6 +17,7 @@ from app.services.product_service import (
     _format_rate,
     _is_duplicate_product_name_error,
     create_product,
+    delete_product,
     update_product,
     search_products,
     activate_product,
@@ -756,3 +758,144 @@ class TestResidualDataIsolation:
         assert len(products) == 0, (
             f"_clean_products did not remove residual data: {products}"
         )
+
+
+class TestDeleteProductService:
+    """Tests for delete_product() service function."""
+
+    def test_delete_not_found(self, db_session):
+        product, status = delete_product(99999)
+        assert product is None
+        assert status == "not_found"
+
+    def test_delete_active_product_returns_active(self, db_session):
+        product = create_product("Chile activo", "5.00")
+        result, status = delete_product(product.id)
+        assert result is None
+        assert status == "active"
+        assert db.session.get(Product, product.id) is not None
+
+    def test_delete_inactive_with_movements(self, db_session):
+        from app.models.harvest_entry import HarvestEntry
+
+        product = create_product("Chile viejo", "3.00")
+        deactivate_product(product.id)
+
+        worker, assignment = make_worker_with_assignment(
+            db_session, name="Test", slot_number=1
+        )
+
+        entry = HarvestEntry(
+            worker_id=worker.id,
+            worker_assignment_id=assignment.id,
+            worker_name_snapshot=worker.name,
+            worker_barcode_snapshot=worker.barcode,
+            worker_slot_number_snapshot=worker.slot_number,
+            weight_kg=Decimal("10.000"),
+            product_id=product.id,
+            product_name_snapshot=product.name,
+            rate_per_kg_snapshot=product.rate_per_kg,
+            amount_mxn=Decimal("30.00"),
+        )
+        db.session.add(entry)
+        db.session.commit()
+
+        result, status = delete_product(product.id)
+        assert result is None
+        assert status == "has_movements"
+        assert db.session.get(Product, product.id) is not None
+
+    def test_delete_inactive_without_movements(self, db_session):
+        product = create_product("Chile temporal", "2.50")
+        deactivate_product(product.id)
+
+        result, status = delete_product(product.id)
+        assert status == "deleted"
+        assert db.session.get(Product, product.id) is None
+
+    def test_delete_returns_product_object(self, db_session):
+        product = create_product("Para borrar", "1.00")
+        deactivate_product(product.id)
+
+        result, status = delete_product(product.id)
+        assert result.id == product.id
+        assert result.name == "Para borrar"
+
+
+class TestDeleteProductAPI:
+    """Tests for DELETE /api/admin/products/<id> endpoint."""
+
+    def test_delete_404_not_found(self, admin_client):
+        csrf = _get_csrf(admin_client)
+        resp = admin_client.delete(
+            "/api/admin/products/99999",
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert resp.status_code == 404
+        assert "no encontrado" in resp.get_json()["error"]
+
+    def test_delete_409_active_product(self, admin_client):
+        product = create_product("Activo para borrar", "5.00")
+        csrf = _get_csrf(admin_client)
+
+        resp = admin_client.delete(
+            f"/api/admin/products/{product.id}",
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert resp.status_code == 409
+        assert "activo" in resp.get_json()["error"].lower()
+
+    def test_delete_409_with_movements(self, admin_client, db_session):
+        from app.services.product_service import deactivate_product
+        from app.models.harvest_entry import HarvestEntry
+
+        product = create_product("Con movimientos", "4.00")
+        deactivate_product(product.id)
+
+        worker, assignment = make_worker_with_assignment(
+            db_session, name="Test", slot_number=99
+        )
+
+        entry = HarvestEntry(
+            worker_id=worker.id,
+            worker_assignment_id=assignment.id,
+            worker_name_snapshot=worker.name,
+            worker_barcode_snapshot=worker.barcode,
+            worker_slot_number_snapshot=worker.slot_number,
+            weight_kg=Decimal("5.000"),
+            product_id=product.id,
+            product_name_snapshot=product.name,
+            rate_per_kg_snapshot=product.rate_per_kg,
+            amount_mxn=Decimal("20.00"),
+        )
+        db.session.add(entry)
+        db.session.commit()
+
+        csrf = _get_csrf(admin_client)
+        resp = admin_client.delete(
+            f"/api/admin/products/{product.id}",
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert resp.status_code == 409
+        assert "hist" in resp.get_json()["error"].lower()
+
+    def test_delete_200_success(self, admin_client, db_session):
+        from app.services.product_service import deactivate_product
+        product = create_product("Para eliminar", "3.00")
+        deactivate_product(product.id)
+
+        csrf = _get_csrf(admin_client)
+        resp = admin_client.delete(
+            f"/api/admin/products/{product.id}",
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert resp.status_code == 200
+        assert "eliminado" in resp.get_json()["message"].lower()
+
+    def test_delete_401_unauthenticated(self, client):
+        resp = client.delete("/api/admin/products/1")
+        assert resp.status_code == 401
+
+    def test_delete_403_no_csrf(self, admin_client):
+        resp = admin_client.delete("/api/admin/products/1")
+        assert resp.status_code == 403

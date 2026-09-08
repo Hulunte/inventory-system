@@ -155,13 +155,13 @@ class TestScaleJsMessages:
         resp = client.get("/static/js/scale.js")
         js = resp.data.decode()
         assert "pyserial_unavailable" in js
-        assert "reinstalar" in js.lower()
+        assert "PySerial no disponible" in js
 
     def test_no_serial_ports_message(self, client):
         resp = client.get("/static/js/scale.js")
         js = resp.data.decode()
         assert "no_serial_ports" in js
-        assert "Conecte la bascula" in js or "conecte" in js.lower()
+        assert "No hay puertos disponibles" in js
 
     def test_scale_not_connected_message(self, client):
         resp = client.get("/static/js/scale.js")
@@ -208,8 +208,8 @@ class TestScaleJsMessages:
         assert "updateUiFromStatus" in js
         assert "status.code" in js or "code" in js
 
-    def test_no_pyserial_unavailable_shown_as_default(self, client):
+    def test_pyserial_message_is_only_used_for_503_or_unavailable_code(self, client):
         resp = client.get("/static/js/scale.js")
         js = resp.data.decode()
-        assert '"pyserial no disponible"' not in js
-        assert '"PySerial no disponible"' not in js
+        assert 'result.status === 503' in js
+        assert 'opt.textContent = MESSAGES.pyserial_unavailable' in js

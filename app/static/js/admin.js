@@ -2,6 +2,9 @@ const logoutBtn = document.getElementById("logout-btn");
 const slotSearchInput = document.getElementById("slot-search-input");
 const slotList = document.getElementById("slot-list");
 const cleanSlotsBtn = document.getElementById("clean-slots-btn");
+const slotsEmailInput = document.getElementById("slots-email-input");
+const emailSlotsBtn = document.getElementById("email-slots-btn");
+const slotsEmailMessage = document.getElementById("slots-email-message");
 const assignModal = document.getElementById("assign-modal");
 const assignModalText = document.getElementById("assign-modal-text");
 const assignForm = document.getElementById("assign-form");
@@ -24,6 +27,7 @@ let csrfToken = "";
 let slotSearchTimeout = null;
 let entrySearchTimeout = null;
 let currentVoidEntryId = null;
+const EXPORT_EMAIL_STORAGE_KEY = "inventory.exportRecipientEmail";
 
 function getCsrfToken() {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -300,6 +304,53 @@ cleanSlotsBtn.addEventListener("click", async () => {
         cleanSlotsBtn.textContent = "Limpiar todas las asignaciones";
     }
 });
+
+
+if (slotsEmailInput && emailSlotsBtn) {
+    slotsEmailInput.value = localStorage.getItem(EXPORT_EMAIL_STORAGE_KEY) || "";
+
+    emailSlotsBtn.addEventListener("click", async () => {
+        const email = slotsEmailInput.value.trim();
+        if (!email || !slotsEmailInput.checkValidity()) {
+            showMessage(slotsEmailMessage, "Correo inválido.", "error");
+            slotsEmailInput.focus();
+            return;
+        }
+
+        emailSlotsBtn.disabled = true;
+        emailSlotsBtn.textContent = "Enviando...";
+        slotsEmailMessage.hidden = true;
+        try {
+            const response = await fetch("/api/admin/worker-slots/export/email", {
+                method: "POST",
+                headers: apiHeaders(),
+                body: JSON.stringify({ email }),
+            });
+            const result = await response.json();
+            if (response.status === 401) {
+                window.location.href = "/admin/login";
+                return;
+            }
+            if (!response.ok) {
+                throw new Error(result.error || "Error de conexión SMTP.");
+            }
+            localStorage.setItem(EXPORT_EMAIL_STORAGE_KEY, email);
+            showMessage(slotsEmailMessage, result.message || "Correo enviado exitosamente.", "success");
+        } catch (error) {
+            showMessage(slotsEmailMessage, error.message || "Error de conexión SMTP.", "error");
+        } finally {
+            emailSlotsBtn.disabled = false;
+            emailSlotsBtn.textContent = "Enviar por correo";
+        }
+    });
+
+    slotsEmailInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            emailSlotsBtn.click();
+        }
+    });
+}
 
 
 async function loadEntries() {

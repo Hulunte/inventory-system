@@ -399,7 +399,7 @@ class TestEmailEndpointErrors:
     def test_smtp_missing_config_returns_503(self, admin_client):
         csrf = _get_csrf(admin_client)
         with patch("app.routes.reports.send_export_email") as mock_send:
-            mock_send.side_effect = SMTPConfigError("SMTP configuration is incomplete")
+            mock_send.side_effect = SMTPConfigError("Falta la variable MAIL_SMTP_USERNAME")
             resp = admin_client.post(
                 "/api/reports/harvest/export/email",
                 json={
@@ -410,7 +410,7 @@ class TestEmailEndpointErrors:
                 headers={"X-CSRF-Token": csrf},
             )
             assert resp.status_code == 503
-            assert "configured" in resp.get_json()["error"].lower()
+            assert resp.get_json()["error"] == "Falta la variable MAIL_SMTP_USERNAME"
 
     def test_smtp_failure_returns_502(self, admin_client):
         csrf = _get_csrf(admin_client)

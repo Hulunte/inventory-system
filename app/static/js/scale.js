@@ -19,10 +19,8 @@
     var lastStable = false;
 
     var MESSAGES = {
-        pyserial_unavailable:
-            "Falta el componente de comunicacion serial. Debe reinstalar el programa.",
-        no_serial_ports:
-            "No hay puertos seriales disponibles. Conecte la bascula y actualice.",
+        pyserial_unavailable: "PySerial no disponible",
+        no_serial_ports: "No hay puertos disponibles",
         scale_not_connected:
             "Hay puertos disponibles, pero no se ha conectado una bascula.",
         port_in_use:
@@ -76,10 +74,19 @@
             var result = await apiCall("GET", "/api/scale/ports");
             portSelect.textContent = "";
 
-            if (result.status === 401 || result.status === 403) {
+            if (result.status === 503) {
                 var opt = document.createElement("option");
                 opt.value = "";
-                opt.textContent = "Sesion expirada. Recargue la pagina.";
+                opt.textContent = MESSAGES.pyserial_unavailable;
+                portSelect.appendChild(opt);
+                connectBtn.disabled = true;
+                return;
+            }
+
+            if (!result.ok) {
+                var opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = (result.data && result.data.error) || "Error al cargar puertos";
                 portSelect.appendChild(opt);
                 connectBtn.disabled = true;
                 return;
@@ -271,14 +278,6 @@
     document.addEventListener("visibilitychange", handleVisibility);
 
     async function init() {
-        try {
-            var result = await apiCall("GET", "/api/scale/status");
-            if (result.ok) {
-                updateUiFromStatus(result.data);
-            }
-        } catch (e) {
-            /* scale not configured */
-        }
         await loadPorts();
     }
 

@@ -30,7 +30,11 @@ echo Construyendo ejecutable...
 echo Esto puede tardar varios minutos.
 echo.
 
-pyinstaller build.spec --clean --noconfirm
+REM Remove complete previous outputs so a failed build cannot leave a stale EXE.
+if exist "build" rmdir /s /q "build"
+if exist "dist" rmdir /s /q "dist"
+
+python build_wrapper.py build.spec --clean --noconfirm
 
 if errorlevel 1 (
     echo.

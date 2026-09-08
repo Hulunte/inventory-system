@@ -22,6 +22,13 @@ _EMAIL_RE = re.compile(
 )
 
 
+@reports_bp.before_request
+def require_reports_admin():
+    if not session.get("admin"):
+        return jsonify({"error": "Admin authentication required"}), 401
+    return None
+
+
 def _require_admin(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -179,8 +186,8 @@ def harvest_export_email():
 
     try:
         send_export_email(email, filename, xlsx_bytes, current_app.config)
-    except SMTPConfigError:
-        return jsonify({"error": "Email service not configured"}), 503
+    except SMTPConfigError as exc:
+        return jsonify({"error": str(exc)}), 503
     except smtplib.SMTPException:
         return jsonify({"error": "Failed to send email"}), 502
     except OSError:

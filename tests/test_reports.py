@@ -328,7 +328,7 @@ class TestHarvestReport:
 
 
 class TestReportEndpoints:
-    def test_report_endpoint_200(self, client, db_session, app):
+    def test_report_endpoint_200(self, admin_client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
             today = datetime.now(tz).date()
@@ -348,7 +348,7 @@ class TestReportEndpoints:
             db_session.add(e)
             db_session.commit()
 
-            response = client.get(
+            response = admin_client.get(
                 f"/api/reports/harvest?start_date={today.isoformat()}"
                 f"&end_date={today.isoformat()}&q=Endpoint+Rpt"
             )
@@ -360,50 +360,50 @@ class TestReportEndpoints:
             assert data["summary"]["total_weight_kg"] == "4.500"
             assert len(data["workers"]) == 1
 
-    def test_report_endpoint_missing_both_dates(self, client, db_session):
-        response = client.get("/api/reports/harvest")
+    def test_report_endpoint_missing_both_dates(self, admin_client, db_session):
+        response = admin_client.get("/api/reports/harvest")
         assert response.status_code == 400
         data = response.get_json()
         assert "start_date and end_date are required" in data["error"]
 
-    def test_report_endpoint_missing_start_date(self, client, db_session):
-        response = client.get("/api/reports/harvest?end_date=2026-08-31")
+    def test_report_endpoint_missing_start_date(self, admin_client, db_session):
+        response = admin_client.get("/api/reports/harvest?end_date=2026-08-31")
         assert response.status_code == 400
         data = response.get_json()
         assert "start_date is required" in data["error"]
 
-    def test_report_endpoint_missing_end_date(self, client, db_session):
-        response = client.get("/api/reports/harvest?start_date=2026-08-01")
+    def test_report_endpoint_missing_end_date(self, admin_client, db_session):
+        response = admin_client.get("/api/reports/harvest?start_date=2026-08-01")
         assert response.status_code == 400
         data = response.get_json()
         assert "end_date is required" in data["error"]
 
-    def test_report_endpoint_invalid_start_date(self, client, db_session):
-        response = client.get(
+    def test_report_endpoint_invalid_start_date(self, admin_client, db_session):
+        response = admin_client.get(
             "/api/reports/harvest?start_date=2026-13-45&end_date=2026-08-31"
         )
         assert response.status_code == 400
         data = response.get_json()
         assert "Invalid start_date" in data["error"]
 
-    def test_report_endpoint_invalid_end_date(self, client, db_session):
-        response = client.get(
+    def test_report_endpoint_invalid_end_date(self, admin_client, db_session):
+        response = admin_client.get(
             "/api/reports/harvest?start_date=2026-08-01&end_date=not-a-date"
         )
         assert response.status_code == 400
         data = response.get_json()
         assert "Invalid end_date" in data["error"]
 
-    def test_report_endpoint_start_after_end(self, client, db_session):
-        response = client.get(
+    def test_report_endpoint_start_after_end(self, admin_client, db_session):
+        response = admin_client.get(
             "/api/reports/harvest?start_date=2026-08-31&end_date=2026-08-01"
         )
         assert response.status_code == 400
         data = response.get_json()
         assert "start_date must not be after end_date" in data["error"]
 
-    def test_report_endpoint_empty_range(self, client, db_session):
-        response = client.get(
+    def test_report_endpoint_empty_range(self, admin_client, db_session):
+        response = admin_client.get(
             "/api/reports/harvest?start_date=2099-01-01&end_date=2099-01-31"
         )
         assert response.status_code == 200
@@ -413,7 +413,7 @@ class TestReportEndpoints:
         assert data["summary"]["total_entries"] == 0
         assert data["summary"]["total_weight_kg"] == "0.000"
 
-    def test_report_endpoint_with_q_filter(self, client, db_session, app):
+    def test_report_endpoint_with_q_filter(self, admin_client, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]
         with app.app_context():
             today = datetime.now(tz).date()
@@ -442,7 +442,7 @@ class TestReportEndpoints:
             db_session.add_all([e1, e2])
             db_session.commit()
 
-            response = client.get(
+            response = admin_client.get(
                 f"/api/reports/harvest?start_date={today.isoformat()}"
                 f"&end_date={today.isoformat()}&q=Filter+Rpt+Me"
             )
@@ -451,14 +451,14 @@ class TestReportEndpoints:
             assert len(data["workers"]) == 1
             assert data["workers"][0]["name"] == "Filter Rpt Me"
 
-    def test_report_page_renders(self, client, db_session):
-        response = client.get("/reports")
+    def test_report_page_renders(self, admin_client, db_session):
+        response = admin_client.get("/reports")
         assert response.status_code == 200
         assert b"Reportes de cosecha" in response.data
 
-    def test_report_page_operational_today(self, client, monkeypatch):
+    def test_report_page_operational_today(self, admin_client, monkeypatch):
         monkeypatch.setattr("app.routes.views._operational_today", lambda: date(2026, 6, 17))
-        response = client.get("/reports")
+        response = admin_client.get("/reports")
         assert response.status_code == 200
         html = response.data.decode()
         assert 'REPORTS_CONFIG' in html

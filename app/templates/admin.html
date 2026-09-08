@@ -54,7 +54,16 @@
                 <a href="/api/admin/worker-slots/export" class="form__button" id="export-slots-btn">
                     Exportar credenciales
                 </a>
+                <div class="slots-email">
+                    <label class="sr-only" for="slots-email-input">Correo destinatario</label>
+                    <input class="form__input" type="email" id="slots-email-input"
+                        placeholder="correo@ejemplo.com" maxlength="254" autocomplete="email">
+                    <button class="form__button" type="button" id="email-slots-btn">
+                        Enviar por correo
+                    </button>
+                </div>
             </div>
+            <p id="slots-email-message" class="form__message" role="status" hidden></p>
 
             <div id="slot-list" class="worker-list">
                 <p class="worker-list__empty">Cargando cupos...</p>

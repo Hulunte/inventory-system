@@ -16,9 +16,35 @@ def _get_csrf(admin_client):
 
 
 class TestScalePortsEndpoint:
-    def test_no_auth_returns_401(self, client):
+    @patch("app.routes.scale.list_ports", return_value=[])
+    @patch("app.routes.scale.is_available", return_value=True)
+    def test_no_auth_empty_ports_returns_200(self, _available, ports, client):
         resp = client.get("/api/scale/ports")
-        assert resp.status_code == 401
+        assert resp.status_code == 200
+        assert resp.get_json()["ports"] == []
+        assert resp.get_json()["message"] == "No hay puertos disponibles"
+        ports.assert_called_once_with(raise_errors=True)
+
+    @patch("app.routes.scale.list_ports", return_value=[])
+    @patch("app.routes.scale.is_available", return_value=True)
+    def test_admin_empty_ports_returns_200(self, _available, _ports, admin_client):
+        resp = admin_client.get("/api/scale/ports")
+        assert resp.status_code == 200
+        assert resp.get_json()["code"] == "no_serial_ports"
+
+    @patch("app.routes.scale.is_available", return_value=False)
+    def test_pyserial_unavailable_returns_503(self, _available, client):
+        resp = client.get("/api/scale/ports")
+        assert resp.status_code == 503
+        assert resp.get_json()["code"] == "pyserial_unavailable"
+        assert resp.get_json()["message"] == "PySerial no disponible"
+
+    @patch("app.routes.scale.list_ports", side_effect=RuntimeError("enumeration failed"))
+    @patch("app.routes.scale.is_available", return_value=True)
+    def test_unexpected_enumeration_error_returns_500(self, _available, _ports, client):
+        resp = client.get("/api/scale/ports")
+        assert resp.status_code == 500
+        assert resp.get_json()["code"] == "serial_port_enumeration_error"
 
     def test_returns_ports_structure(self, admin_client):
         resp = admin_client.get("/api/scale/ports")
@@ -32,6 +58,21 @@ class TestScalePortsEndpoint:
         assert isinstance(data["available"], bool)
         assert isinstance(data["code"], str)
         assert isinstance(data["message"], str)
+
+    def test_empty_ports_ui_does_not_claim_session_expired(self, client):
+        javascript = client.get("/static/js/scale.js").get_data(as_text=True)
+        assert 'no_serial_ports: "No hay puertos disponibles"' in javascript
+        assert "Sesion expirada" not in javascript
+        assert "Sesión expirada" not in javascript
+
+    def test_anonymous_initialization_only_fetches_public_ports(self, client):
+        javascript = client.get("/static/js/scale.js").get_data(as_text=True)
+        init_body = javascript.split("async function init()", 1)[1].split(
+            "init();", 1
+        )[0]
+        assert 'await loadPorts()' in init_body
+        assert 'apiCall("GET", "/api/scale/status")' not in init_body
+        assert "initCsrfToken" not in javascript
 
 
 class TestScaleStatusEndpoint:
