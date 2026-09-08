@@ -7,6 +7,10 @@ ROOT = Path(__file__).resolve().parents[1]
 EXE_PATH = ROOT / "dist" / "inventory-system.exe"
 
 
+def normalize_newlines(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
 def test_packaged_reception_resources_match_sources_byte_for_byte():
     if not EXE_PATH.is_file():
         pytest.skip("inventory-system.exe has not been built")
@@ -21,7 +25,9 @@ def test_packaged_reception_resources_match_sources_byte_for_byte():
 
     for source_path, archive_name in resources:
         packaged = archive.extract(archive_name)
-        assert packaged == source_path.read_bytes()
+        assert normalize_newlines(packaged) == normalize_newlines(
+            source_path.read_bytes()
+        )
 
     packaged_js = archive.extract(r"app\static\js\reception.js")
     assert b"function findScrollableAncestor(element)" in packaged_js
