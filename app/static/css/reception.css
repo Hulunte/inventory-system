@@ -62,7 +62,21 @@ body {
 
 .reception-wrapper {
     width: 100%;
-    max-width: 640px;
+    max-width: 1180px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.reception-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 0.72fr);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.reception-main {
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -554,6 +568,158 @@ body {
 
 .recent-movements {
     scroll-margin-block: 1rem;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+#movements-content {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    min-height: 0;
+}
+
+.quick-void-dialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(92vw, 430px);
+    max-height: min(90vh, 620px);
+    overflow-y: auto;
+    border: 0;
+    border-radius: 18px;
+    padding: 0;
+    color: var(--clr-text);
+    background: var(--clr-surface);
+    box-shadow: 0 24px 70px rgb(0 0 0 / 34%);
+}
+
+.quick-void-dialog::backdrop {
+    background: rgb(10 35 20 / 62%);
+    backdrop-filter: blur(2px);
+}
+
+.quick-void-dialog__content {
+    padding: 1.65rem;
+}
+
+.quick-void-dialog__content h2 {
+    margin: 0.65rem 0 0.35rem;
+    color: var(--clr-primary-hover);
+    text-align: center;
+}
+
+.quick-void-dialog__icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--clr-primary);
+    font-size: 1.55rem;
+    font-weight: 800;
+}
+
+.quick-void-dialog__intro {
+    margin: 0 0 1rem;
+    color: var(--clr-text-muted);
+    text-align: center;
+}
+
+.quick-void-dialog__details {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--clr-border);
+    border-radius: 12px;
+    background: var(--clr-primary-light);
+}
+
+.quick-void-dialog__details div {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+}
+
+.quick-void-dialog__details dt {
+    color: var(--clr-text-muted);
+    font-weight: 600;
+}
+
+.quick-void-dialog__details dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
+.quick-void-dialog__warning {
+    margin: 1rem 0 0;
+    padding: 0.7rem 0.85rem;
+    border-left: 4px solid var(--clr-warning, #b7791f);
+    border-radius: 6px;
+    background: #fff8e8;
+    font-weight: 700;
+}
+
+.quick-void-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+.quick-void-dialog__actions button {
+    min-height: 2.75rem;
+    padding: 0.7rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#quick-void-cancel {
+    border-color: var(--clr-border);
+    color: var(--clr-primary-hover);
+    background: var(--clr-surface);
+}
+
+#quick-void-confirm {
+    color: #fff;
+    background: var(--clr-primary);
+}
+
+#quick-void-confirm:hover,
+#quick-void-confirm:focus-visible {
+    background: var(--clr-primary-hover);
+}
+
+.quick-void-dialog__actions button:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--clr-primary) 35%, transparent);
+    outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+    .quick-void-dialog__content {
+        padding: 1.15rem;
+    }
+
+    .quick-void-dialog__actions {
+        flex-direction: column-reverse;
+    }
+
+    .quick-void-dialog__actions button {
+        width: 100%;
+    }
+}
+
+body:has(.quick-void-dialog[open]) {
+    overflow: hidden;
 }
 
 .movement {
@@ -653,8 +819,18 @@ body {
     font-weight: 400;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 900px) {
+    .reception-wrapper {
+        max-width: 640px;
+    }
+
+    .reception-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .recent-movements {
+        position: static;
+        max-height: none;
         padding: 0.75rem;
     }
 
@@ -665,11 +841,12 @@ body {
     }
 
     .recent-movements__header {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        background: var(--clr-surface);
+        position: static;
     }
+
+}
+
+@media (max-width: 480px) {
 
     .movement__row {
         flex-direction: column;

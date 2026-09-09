@@ -38,6 +38,8 @@
             </div>
         </header>
 
+        <div class="reception-layout">
+        <div class="reception-main">
         <section class="card product-selector" id="product-selector">
             <h2 class="product-selector__title">Producto</h2>
             <div id="product-buttons" class="product-selector__buttons">
@@ -119,7 +121,9 @@
             </div>
         </div>
 
-        <section class="card recent-movements" id="recent-movements">
+        </div>
+
+        <aside class="card recent-movements" id="recent-movements" aria-label="Movimientos recientes">
             <div class="recent-movements__header">
                 <h2 class="recent-movements__title">Movimientos recientes</h2>
                 <button type="button" class="recent-movements__refresh" id="refresh-movements">
@@ -132,11 +136,32 @@
                     Cargando movimientos...
                 </div>
             </div>
-        </section>
+        </aside>
+        </div>
 
     </div>
 
-    <script src="{{ url_for('static', filename='js/reception.js', v='20260908-1') }}"></script>
+    <dialog class="quick-void-dialog" id="quick-void-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-void-title">
+        <form method="dialog" class="quick-void-dialog__content">
+            <div class="quick-void-dialog__icon" aria-hidden="true">!</div>
+            <h2 id="quick-void-title">Confirmar anulación</h2>
+            <p class="quick-void-dialog__intro">Revise el movimiento antes de continuar.</p>
+            <dl class="quick-void-dialog__details">
+                <div><dt>Trabajador</dt><dd id="quick-void-worker">—</dd></div>
+                <div><dt>Código</dt><dd id="quick-void-code">—</dd></div>
+                <div><dt>Producto</dt><dd id="quick-void-product">—</dd></div>
+                <div><dt>Peso</dt><dd id="quick-void-weight">—</dd></div>
+                <div><dt>Importe</dt><dd id="quick-void-amount">—</dd></div>
+            </dl>
+            <p class="quick-void-dialog__warning">Esta acción no se puede deshacer.</p>
+            <div class="quick-void-dialog__actions">
+                <button type="submit" value="cancel" class="btn btn--secondary" id="quick-void-cancel">Cancelar</button>
+                <button type="submit" value="confirm" class="btn btn--danger" id="quick-void-confirm" autofocus>Anular movimiento</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script src="{{ url_for('static', filename='js/reception.js', v='20260908-5') }}"></script>
     <script src="{{ url_for('static', filename='js/scale.js') }}"></script>
     <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
 </body>

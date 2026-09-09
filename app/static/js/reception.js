@@ -5,6 +5,15 @@ const productWarning = document.getElementById("product-warning");
 const movementsContent = document.getElementById("movements-content");
 const refreshMovementsBtn = document.getElementById("refresh-movements");
 const recentMovementsSection = document.getElementById("recent-movements");
+const quickVoidDialog = document.getElementById("quick-void-dialog");
+const quickVoidConfirmBtn = document.getElementById("quick-void-confirm");
+const quickVoidFields = {
+    worker: document.getElementById("quick-void-worker"),
+    code: document.getElementById("quick-void-code"),
+    product: document.getElementById("quick-void-product"),
+    weight: document.getElementById("quick-void-weight"),
+    amount: document.getElementById("quick-void-amount"),
+};
 
 const STORAGE_KEY = "inventory.selectedProductId";
 const SCANNER_DEBUG = new URLSearchParams(window.location.search)
@@ -24,19 +33,30 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+async function responseError(response, operation) {
+    let detail = "";
+    try {
+        const body = await response.json();
+        detail = typeof body.error === "string" ? body.error : "";
+    } catch (_) {
+        detail = response.statusText || "Respuesta no válida";
+    }
+    return new Error(`${operation} (HTTP ${response.status})${detail ? `: ${detail}` : ""}`);
+}
+
 async function loadProducts() {
     try {
         const response = await fetch("/api/products/active");
         if (!response.ok) {
-            throw new Error("Error loading products");
+            throw await responseError(response, "No fue posible cargar los productos");
         }
         allProducts = await response.json();
     } catch (error) {
-        console.error(error);
+        console.error("Error al cargar /api/products/active:", error);
         allProducts = [];
         productButtonsContainer.hidden = true;
         productWarning.hidden = false;
-        productWarning.textContent = "No fue posible cargar los productos. Intente nuevamente.";
+        productWarning.textContent = error.message;
         return;
     }
 
@@ -465,6 +485,26 @@ async function showWorker(worker) {
 
 let isLoadingMovements = false;
 let movementsPollInterval = null;
+let recentAdminAuthenticated = false;
+let recentCsrfToken = "";
+let recentMovementsById = new Map();
+let quickVoidPromise = null;
+
+async function loadRecentAdminSession() {
+    try {
+        const response = await fetch("/api/admin/session", {cache: "no-store"});
+        if (!response.ok) return false;
+        const data = await response.json();
+        recentAdminAuthenticated = data.authenticated === true;
+        recentCsrfToken = recentAdminAuthenticated ? (data.csrf_token || "") : "";
+        return recentAdminAuthenticated;
+    } catch (error) {
+        console.error("No fue posible validar la sesión administrativa del preview.", error);
+        recentAdminAuthenticated = false;
+        recentCsrfToken = "";
+        return false;
+    }
+}
 
 async function loadRecentMovements() {
     if (isLoadingMovements) {
@@ -475,14 +515,18 @@ async function loadRecentMovements() {
     refreshMovementsBtn.disabled = true;
 
     try {
-        const response = await fetch("/api/harvest/recent?limit=10");
+        const [response] = await Promise.all([
+            fetch("/api/harvest/recent?limit=10", {cache: "no-store"}),
+            loadRecentAdminSession(),
+        ]);
 
         if (!response.ok) {
-            throw new Error("Error loading movements");
+            throw await responseError(response, "No fue posible cargar los movimientos");
         }
 
         const data = await response.json();
         const movements = data.movements;
+        recentMovementsById = new Map(movements.map(movement => [String(movement.id), movement]));
 
         if (movements.length === 0) {
             movementsContent.innerHTML = `
@@ -511,7 +555,7 @@ async function loadRecentMovements() {
                         <span class="movement__time">${escapeHtml(m.time)}</span>
                         <span class="movement__worker">${slotLabel}${escapeHtml(m.worker.name || "Sin nombre")} (${escapeHtml(m.worker.barcode || "")})</span>
                         <span class="movement__badge movement__badge--${m.voided ? "voided" : "active"}">${escapeHtml(statusLabel)}</span>
-                        ${m.can_void && !m.voided ? `<button type="button" class="movement__void-btn" data-void-entry-id="${m.id}">Anular</button>` : ""}
+                        ${recentAdminAuthenticated && m.can_void && !m.voided ? `<button type="button" class="movement__void-btn" data-void-entry-id="${m.id}">Anular</button>` : ""}
                     </div>
                     <div class="movement__row movement__details">
                         <span class="movement__product">${productName}</span>
@@ -525,12 +569,12 @@ async function loadRecentMovements() {
         html += '</div>';
         movementsContent.innerHTML = html;
     } catch (error) {
-        console.error(error);
+        console.error("Error al cargar /api/harvest/recent?limit=10:", error);
 
         if (!movementsContent.querySelector('.movements-list')) {
             movementsContent.innerHTML = `
                 <div class="status-message status-message--error">
-                    No fue posible cargar los movimientos.
+                    ${escapeHtml(error.message)}
                 </div>
             `;
         }
@@ -550,23 +594,67 @@ async function showRecentMovementAfterRegistration() {
     barcodeInput.focus({preventScroll: true});
 }
 
+function confirmQuickVoid(movement, opener) {
+    if (!quickVoidDialog || typeof quickVoidDialog.showModal !== "function" || !movement) {
+        return Promise.resolve(false);
+    }
+    if (quickVoidPromise) return quickVoidPromise;
+
+    quickVoidFields.worker.textContent = movement.worker.name || "Sin nombre";
+    quickVoidFields.code.textContent = movement.worker.barcode || "—";
+    quickVoidFields.product.textContent = movement.product_name || "Sin producto";
+    quickVoidFields.weight.textContent = `${movement.weight_kg} kg`;
+    quickVoidFields.amount.textContent = movement.amount_mxn ? `$${movement.amount_mxn} MXN` : "—";
+
+    quickVoidPromise = new Promise(resolve => {
+        const handleClose = () => {
+            const confirmed = quickVoidDialog.returnValue === "confirm";
+            quickVoidPromise = null;
+            if (opener && opener.isConnected) opener.focus({preventScroll: true});
+            resolve(confirmed);
+        };
+        quickVoidDialog.addEventListener("close", handleClose, {once: true});
+        quickVoidDialog.showModal();
+        quickVoidConfirmBtn.focus({preventScroll: true});
+    });
+    return quickVoidPromise;
+}
+
+if (quickVoidDialog && quickVoidConfirmBtn) {
+    quickVoidDialog.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!quickVoidConfirmBtn.disabled) quickVoidDialog.close("confirm");
+        } else if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            quickVoidDialog.close("cancel");
+        }
+    });
+}
+
 movementsContent.addEventListener("click", async event => {
     const button = event.target.closest("[data-void-entry-id]");
     if (!button) return;
-    if (!window.confirm("¿Confirma la anulación inmediata de este movimiento?")) return;
+    if (button.dataset.voidPending === "true") return;
+    button.dataset.voidPending = "true";
+    const movement = recentMovementsById.get(button.dataset.voidEntryId);
+    if (!(await confirmQuickVoid(movement, button))) {
+        delete button.dataset.voidPending;
+        return;
+    }
 
     button.disabled = true;
     try {
-        const sessionResponse = await fetch("/api/admin/session");
-        const sessionData = await sessionResponse.json();
-        if (!sessionData.authenticated) {
+        if (!(await loadRecentAdminSession())) {
             throw new Error("Se requiere una sesión administrativa activa.");
         }
         const response = await fetch(`/api/admin/harvest-entries/${button.dataset.voidEntryId}/void`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRF-Token": sessionData.csrf_token,
+                "X-CSRF-Token": recentCsrfToken,
             },
             body: JSON.stringify({reason: "Anulación rápida"}),
         });
@@ -578,6 +666,7 @@ movementsContent.addEventListener("click", async event => {
     } catch (error) {
         alert(error.message);
         button.disabled = false;
+        delete button.dataset.voidPending;
     }
 });
 

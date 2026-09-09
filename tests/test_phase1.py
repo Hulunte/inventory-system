@@ -119,12 +119,139 @@ def test_recent_preview_only_offers_quick_void_to_admin(admin_client, client, db
     assert next(row for row in admin if row["id"] == entry.id)["can_void"] is True
 
 
+def test_complete_reception_load_anonymous_movement_and_quick_void(
+    admin_client, client, db_session
+):
+    """Exercise the API sequence used by reception.js as one integration flow."""
+    worker = make_worker(db_session, name=None, slot_number=3)
+    product = _product(db_session)
+    db_session.commit()
+
+    page = client.get("/")
+    assert page.status_code == 200
+    assert b"js/reception.js" in page.data
+
+    products_response = client.get("/api/products/active")
+    assert products_response.status_code == 200
+    assert products_response.get_json() == [{
+        "id": product.id,
+        "name": product.name,
+        "rate_per_kg": "7.50",
+    }]
+
+    empty_recent = client.get("/api/harvest/recent?limit=10")
+    assert empty_recent.status_code == 200
+    assert empty_recent.get_json() == {"movements": []}
+
+    created = client.post("/api/harvest/entries", json={
+        "barcode": worker.barcode,
+        "weight_kg": "2.000",
+        "product_id": product.id,
+    })
+    assert created.status_code == 201
+    assert created.get_json()["worker"]["name"] == "Sin nombre"
+
+    public_recent = client.get("/api/harvest/recent?limit=10")
+    assert public_recent.status_code == 200
+    public_movement = public_recent.get_json()["movements"][0]
+    assert public_movement["worker"]["name"] == "Sin nombre"
+    assert public_movement["product_name"] == product.name
+    assert public_movement["can_void"] is False
+
+    admin_recent = admin_client.get("/api/harvest/recent?limit=10")
+    assert admin_recent.status_code == 200
+    admin_movement = admin_recent.get_json()["movements"][0]
+    assert admin_movement["id"] == public_movement["id"]
+    assert admin_movement["can_void"] is True
+
+    csrf = admin_client.get("/api/admin/session").get_json()["csrf_token"]
+    voided = admin_client.patch(
+        f"/api/admin/harvest-entries/{admin_movement['id']}/void",
+        json={"reason": "Anulación rápida"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert voided.status_code == 200
+    assert voided.get_json()["voided"] is True
+
+
 def test_quick_void_confirmation_can_cancel_without_request(client):
     js = client.get("/static/js/reception.js").get_data(as_text=True)
-    confirmation = js.index("window.confirm")
+    template = client.get("/").get_data(as_text=True)
+    confirmation = js.index("await confirmQuickVoid(movement, button)")
     request = js.index("/api/admin/harvest-entries/", confirmation)
     assert "return" in js[confirmation:request]
+    assert 'id="quick-void-dialog"' in template
+    assert 'value="cancel"' in template
+    assert 'value="confirm"' in template
     assert 'reason: "Anulación rápida"' in js[request:]
+
+
+def test_quick_void_modal_accessibility_keyboard_focus_and_double_submit(client):
+    html = client.get("/").get_data(as_text=True)
+    js = client.get("/static/js/reception.js").get_data(as_text=True)
+    css = client.get("/static/css/reception.css").get_data(as_text=True)
+
+    assert 'id="quick-void-dialog"' in html
+    assert 'role="dialog"' in html
+    assert 'aria-modal="true"' in html
+    assert 'aria-labelledby="quick-void-title"' in html
+    assert 'id="quick-void-confirm" autofocus' in html
+    for field in ("worker", "code", "product", "weight", "amount"):
+        assert f'id="quick-void-{field}"' in html
+    assert "Esta acción no se puede deshacer." in html
+
+    dialog_rule = css.split(".quick-void-dialog {", 1)[1].split("}", 1)[0]
+    assert "position: fixed" in dialog_rule
+    assert "inset: 0" in dialog_rule
+    assert "margin: auto" in dialog_rule
+    assert ".quick-void-dialog::backdrop" in css
+    assert "body:has(.quick-void-dialog[open])" in css
+
+    assert 'event.key === "Enter"' in js
+    assert 'event.key === "Escape"' in js
+    assert 'quickVoidDialog.close("confirm")' in js
+    assert 'quickVoidDialog.close("cancel")' in js
+    assert "event.preventDefault()" in js
+    assert "opener.focus({preventScroll: true})" in js
+    assert 'button.dataset.voidPending === "true"' in js
+    assert "button.disabled = true" in js
+
+
+def test_modal_initialization_cannot_interrupt_reception_loading(client):
+    html = client.get("/").get_data(as_text=True)
+    js = client.get("/static/js/reception.js").get_data(as_text=True)
+
+    assert html.count('id="quick-void-dialog"') == 1
+    assert html.count('id="quick-void-confirm"') == 1
+    assert "if (quickVoidDialog && quickVoidConfirmBtn)" in js
+    assert 'fetch("/api/products/active")' in js
+    assert 'fetch("/api/harvest/recent?limit=10"' in js
+    assert js.rstrip().endswith("startMovementsPolling();")
+    assert js.rfind("loadRecentMovements();") > js.index(
+        "if (quickVoidDialog && quickVoidConfirmBtn)"
+    )
+
+
+def test_reception_endpoints_return_real_movement_shape_with_modal_present(
+    client, db_session
+):
+    worker, assignment = make_worker_with_assignment(
+        db_session, name="Movimiento integración modal"
+    )
+    product = _product(db_session)
+    entry, _ = register_harvest(worker.barcode, Decimal("2.250"), product.id)
+    db_session.commit()
+
+    assert client.get("/").status_code == 200
+    products = client.get("/api/products/active")
+    recent = client.get("/api/harvest/recent?limit=10")
+    assert products.status_code == 200
+    assert recent.status_code == 200
+    assert any(row["id"] == product.id for row in products.get_json())
+    movement = next(row for row in recent.get_json()["movements"] if row["id"] == entry.id)
+    assert movement["product_name"] == entry.product_name_snapshot
+    assert movement["worker"]["name"] == entry.worker_name_snapshot
+    assert movement["weight_kg"] == "2.250"
 
 
 def test_scale_phase1_defaults_do_not_auto_open_port(monkeypatch):

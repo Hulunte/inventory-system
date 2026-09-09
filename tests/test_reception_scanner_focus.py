@@ -34,7 +34,7 @@ def test_successful_worker_flow_scrolls_real_weight_control():
 
 def test_reception_template_versions_scanner_javascript():
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    assert "filename='js/reception.js', v='20260908-1'" in template
+    assert "filename='js/reception.js', v='20260908-5'" in template
 
 
 def test_successful_worker_flow_focuses_weight_control():
