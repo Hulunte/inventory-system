@@ -167,21 +167,24 @@ async function selectAssignment(assignmentId, date) {
                 <thead>
                     <tr>
                         <th>Hora</th>
-                        <th class="num">Peso (kg)</th>
+                        <th>Tipo</th><th>Producto</th><th>Arpillas / promedio</th><th class="num">Peso (kg)</th><th class="num">Importe</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${data.entries.map(e => `
                         <tr>
                             <td>${escapeHtml(e.created_at)}</td>
+                            <td>${escapeHtml(e.registration_type_label)}</td>
+                            <td>${escapeHtml(e.product_name || "—")}</td>
+                            <td>${e.sack_count ? `${e.sack_count} / ${escapeHtml(e.average_sack_weight_kg)} kg` : "—"}</td>
                             <td class="num">${e.weight_kg}</td>
+                            <td class="num">${e.amount_mxn == null ? "—" : `$${escapeHtml(e.amount_mxn)}`}</td>
                         </tr>
                     `).join("")}
                 </tbody>
                 <tfoot>
                     <tr class="detail-total">
-                        <td>Total</td>
-                        <td class="num bold">${data.summary.total_weight_kg}</td>
+                        <td colspan="4">Total</td><td class="num bold">${data.summary.total_weight_kg}</td><td></td>
                     </tr>
                 </tfoot>
             </table>

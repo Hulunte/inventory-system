@@ -2,6 +2,7 @@ const barcodeInput = document.getElementById("barcode");
 const productInfo = document.getElementById("product-info");
 const productButtonsContainer = document.getElementById("product-buttons");
 const productWarning = document.getElementById("product-warning");
+const scaleProductStatistics = document.getElementById("scale-product-statistics");
 const movementsContent = document.getElementById("movements-content");
 const refreshMovementsBtn = document.getElementById("refresh-movements");
 const recentMovementsSection = document.getElementById("recent-movements");
@@ -57,6 +58,7 @@ async function loadProducts() {
         productButtonsContainer.hidden = true;
         productWarning.hidden = false;
         productWarning.textContent = error.message;
+        window.dispatchEvent(new CustomEvent("inventory:products-loaded", {detail: []}));
         return;
     }
 
@@ -64,6 +66,7 @@ async function loadProducts() {
         productButtonsContainer.hidden = true;
         productWarning.hidden = false;
         productWarning.textContent = "No hay productos activos. Contacte al administrador.";
+        window.dispatchEvent(new CustomEvent("inventory:products-loaded", {detail: []}));
         return;
     }
 
@@ -72,6 +75,23 @@ async function loadProducts() {
 
     renderProductButtons();
     restoreSelection();
+    scaleProductStatistics.innerHTML = averageSummaryMarkup(
+        allProducts.find(product => product.id === selectedProductId)
+    );
+    window.dispatchEvent(new CustomEvent("inventory:products-loaded", {detail: allProducts}));
+}
+
+function averageSummaryMarkup(product) {
+    if (!product) return "<strong>Promedios del producto</strong><span>Seleccione un producto para consultar sus promedios.</span>";
+    const stats = product.sack_statistics || {};
+    const unavailable = "Promedio no disponible";
+    return `<strong>Promedios del producto</strong>
+        <span>Kg por arpilla: ${escapeHtml(stats.average_kg_per_sack || product.average_sack_weight_kg || unavailable)}</span>
+        <span>Kg por movimiento: ${escapeHtml(stats.average_kg_per_movement || unavailable)}</span>
+        <span>Arpillas: ${Number(stats.total_sacks || 0)}</span>
+        <span>Movimientos: ${Number(stats.total_movements || 0)}</span>
+        <span>Total: ${escapeHtml(stats.total_kg || "0.000")} kg</span>
+        <span>Importe: $${escapeHtml(stats.total_amount_mxn || "0.00")}</span>`;
 }
 
 function renderProductButtons() {
@@ -102,6 +122,9 @@ function selectProduct(productId) {
         /* storage unavailable */
     }
     renderProductButtons();
+    scaleProductStatistics.innerHTML = averageSummaryMarkup(
+        allProducts.find(product => product.id === productId)
+    );
 
     const weightInput = document.getElementById("weight_kg");
     if (weightInput) {
@@ -142,7 +165,7 @@ function restoreSelection() {
     renderProductButtons();
 }
 
-loadProducts();
+window.receptionProductsReady = loadProducts();
 
 
 function findScrollableAncestor(element) {
@@ -544,6 +567,9 @@ async function loadRecentMovements() {
             const productName = m.product_name ? escapeHtml(m.product_name) : "Sin producto";
             const rateDisplay = m.rate_per_kg ? `$${escapeHtml(m.rate_per_kg)}` : "\u2014";
             const amountDisplay = m.amount_mxn ? `$${escapeHtml(m.amount_mxn)} MXN` : "\u2014";
+            const typeDisplay = m.registration_type === "sacks"
+                ? `Arpillas · ${m.sack_count} arpillas · peso estimado · ${escapeHtml(m.average_sack_weight_kg)} kg/arpilla`
+                : "Báscula · peso medido";
 
             const slotLabel = m.worker.slot_label
                 ? `${escapeHtml(m.worker.slot_label)} — `
@@ -562,6 +588,7 @@ async function loadRecentMovements() {
                         <span class="movement__weight">${escapeHtml(m.weight_kg)} kg</span>
                         <span class="movement__rate">${rateDisplay}/kg</span>
                         <span class="movement__amount">${amountDisplay}</span>
+                        <span class="movement__type">${typeDisplay}</span>
                     </div>
                 </div>
             `;

@@ -137,6 +137,16 @@ def test_complete_reception_load_anonymous_movement_and_quick_void(
         "id": product.id,
         "name": product.name,
         "rate_per_kg": "7.50",
+        "average_sack_weight_kg": None,
+        "sack_statistics": {
+            "average_kg_per_movement": None,
+            "average_kg_per_sack": None,
+            "period": None,
+            "total_amount_mxn": "0.00",
+            "total_kg": "0.000",
+            "total_movements": 0,
+            "total_sacks": 0,
+        },
     }]
 
     empty_recent = client.get("/api/harvest/recent?limit=10")

@@ -32,7 +32,7 @@
                     <a href="/admin" class="reception-header__link">Administraci&oacute;n</a>
                     <a href="/history" class="reception-header__link">Historial</a>
                     <a href="/reports" class="reception-header__link">Reportes</a>
-                    <a href="/tickets" class="reception-header__link">Tickets</a>
+                    <a href="/tickets" class="reception-header__link reception-header__link--tickets">Ir a tickets</a>
                 </nav>
                 <p class="reception-header__subtitle">Escanee el c&oacute;digo del trabajador</p>
             </div>
@@ -51,9 +51,14 @@
             <div id="product-warning" class="status-message status-message--error" hidden>
                 No hay productos activos. Contacte al administrador.
             </div>
+            <div id="scale-product-statistics" class="average-summary" aria-live="polite">
+                <strong>Promedios del producto</strong>
+                <span>Seleccione un producto para consultar sus promedios.</span>
+            </div>
         </section>
 
         <section class="card scanner-zone">
+            <div class="scanner-zone__heading">
             <div class="scanner-zone__icon">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -66,9 +71,18 @@
                     <line x1="7" y1="16" x2="17" y2="16" />
                 </svg>
             </div>
+            <a class="scanner-zone__tickets" href="/tickets#quick-scan-section" aria-label="Ir a impresión rápida de tickets">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                    <path d="M6 14h12v8H6z"/>
+                </svg>
+                <span>Ir a tickets</span>
+            </a>
+            </div>
             <label class="scanner-zone__label" for="barcode">C&oacute;digo del trabajador</label>
             <input class="scanner-zone__input" type="text" id="barcode"
                 placeholder="Escanee o escriba un c&oacute;digo" autocomplete="off" autofocus>
+            <button class="scanner-zone__sacks" type="button" id="open-sacks-mode">Modo por arpillas</button>
         </section>
 
         <section class="card scale-section" id="scale-section">
@@ -123,6 +137,32 @@
 
         </div>
 
+        <section class="card sacks-mode" id="sacks-mode" hidden aria-labelledby="sacks-mode-title">
+            <div class="sacks-mode__header">
+                <div>
+                    <h2 id="sacks-mode-title">Modo por arpillas</h2>
+                    <p>El peso registrado es estimado; no proviene de la b&aacute;scula.</p>
+                </div>
+                <button type="button" class="btn btn--secondary" id="close-sacks-mode">Regresar a modo b&aacute;scula</button>
+            </div>
+            <form id="sacks-form" class="sacks-mode__form" autocomplete="off">
+                <label for="sacks-barcode">C&oacute;digo del trabajador</label>
+                <input id="sacks-barcode" required placeholder="Escanee o escriba el c&oacute;digo">
+                <div id="sacks-worker" class="sacks-mode__worker">Esperando trabajador...</div>
+                <fieldset class="sacks-mode__products">
+                    <legend>Producto</legend>
+                    <div id="sacks-product-buttons" class="product-selector__buttons" role="radiogroup" aria-label="Producto para arpillas">
+                        <div class="status-message status-message--loading"><span class="spinner"></span>Cargando productos...</div>
+                    </div>
+                </fieldset>
+                <label for="sacks-count">Cantidad de arpillas</label>
+                <input id="sacks-count" type="number" min="1" step="1" inputmode="numeric" required>
+                <div id="sacks-statistics" class="sacks-mode__statistics average-summary">Promedio no disponible</div>
+                <button type="submit" class="btn btn--primary" id="sacks-submit">Registrar peso estimado</button>
+                <div id="sacks-message" class="status-message" hidden aria-live="polite"></div>
+            </form>
+        </section>
+
         <aside class="card recent-movements" id="recent-movements" aria-label="Movimientos recientes">
             <div class="recent-movements__header">
                 <h2 class="recent-movements__title">Movimientos recientes</h2>
@@ -161,7 +201,8 @@
         </form>
     </dialog>
 
-    <script src="{{ url_for('static', filename='js/reception.js', v='20260908-5') }}"></script>
+    <script src="{{ url_for('static', filename='js/reception.js', v='20260909-6') }}"></script>
+    <script src="{{ url_for('static', filename='js/sacks.js', v='20260909-2') }}"></script>
     <script src="{{ url_for('static', filename='js/scale.js') }}"></script>
     <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
 </body>

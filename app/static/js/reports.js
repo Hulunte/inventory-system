@@ -133,6 +133,7 @@ async function loadReport() {
                         <th>Trabajador</th>
                         <th>Código</th>
                         <th class="num">Tandas</th>
+                        <th class="num">Báscula / Arpillas</th>
                         <th class="num">Total kg</th>
                         <th class="num">Importe</th>
                     </tr>
@@ -144,6 +145,7 @@ async function loadReport() {
                             <td>${w.name ? escapeHtml(w.name) : "Sin asignar"}</td>
                             <td class="mono">${w.barcode ? escapeHtml(w.barcode) : "—"}</td>
                             <td class="num">${w.entries_count}</td>
+                            <td class="num">${w.scale_entries_count} / ${w.sack_entries_count} (${w.total_sacks} arpillas)</td>
                             <td class="num bold">${w.total_weight_kg}</td>
                             <td class="num bold">$${w.total_amount_mxn}</td>
                         </tr>
@@ -153,6 +155,7 @@ async function loadReport() {
                     <tr class="summary-total">
                         <td colspan="3">TOTAL</td>
                         <td class="num">${data.summary.total_entries}</td>
+                        <td></td>
                         <td class="num bold">${data.summary.total_weight_kg}</td>
                         <td class="num bold">$${data.summary.total_amount_mxn}</td>
                     </tr>

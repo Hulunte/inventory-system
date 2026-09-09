@@ -68,6 +68,9 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
             HarvestEntry.product_name_snapshot,
             HarvestEntry.rate_per_kg_snapshot,
             HarvestEntry.amount_mxn,
+            HarvestEntry.registration_type,
+            HarvestEntry.sack_count,
+            HarvestEntry.average_sack_weight_kg_snapshot,
         )
         .filter(
             HarvestEntry.created_at >= start_utc,
@@ -96,6 +99,7 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
         "ID", "Fecha", "Hora", "Trabajador", "Código", "Cupo",
         "Peso (kg)", "Producto", "Precio/kg", "Importe",
         "Estado", "Fecha y hora de anulación", "Motivo de anulación",
+        "Tipo de registro", "Cantidad de arpillas", "Promedio kg/arpilla", "Peso estimado",
     ]
     _write_header_row(ws_mov, mov_headers)
 
@@ -139,6 +143,12 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
             ws_mov.cell(row=row_idx, column=12, value=None)
 
         ws_mov.cell(row=row_idx, column=13, value=_safe_text(entry.void_reason) if entry.void_reason else None)
+        ws_mov.cell(row=row_idx, column=14, value="Arpillas" if entry.registration_type == "sacks" else "Báscula")
+        ws_mov.cell(row=row_idx, column=15, value=entry.sack_count)
+        avg_cell = ws_mov.cell(row=row_idx, column=16, value=entry.average_sack_weight_kg_snapshot)
+        if avg_cell.value is not None:
+            avg_cell.number_format = "0.000"
+        ws_mov.cell(row=row_idx, column=17, value="Sí" if entry.registration_type == "sacks" else "No")
 
     ws_mov.freeze_panes = "A2"
     ws_mov.auto_filter.ref = f"A1:{get_column_letter(len(mov_headers))}{len(entries) + 1}"
@@ -148,17 +158,22 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
 
     res_headers = [
         "Trabajador", "Código", "Cupo", "Movimientos vigentes",
-        "Peso vigente (kg)", "Movimientos anulados", "Peso anulado (kg)",
+        "Peso vigente (kg)", "Importe vigente", "Movimientos anulados", "Peso anulado (kg)",
     ]
     _write_header_row(ws_res, res_headers)
 
     worker_summary = {}
     for entry in entries:
-        key = (entry.worker_assignment_id, entry.worker_name_snapshot, entry.worker_barcode_snapshot, entry.worker_slot_number_snapshot)
+        key = entry.worker_assignment_id
         if key not in worker_summary:
             worker_summary[key] = {
+                "name": entry.worker_name_snapshot,
+                "barcode": entry.worker_barcode_snapshot,
+                "slot_num": entry.worker_slot_number_snapshot,
                 "vigentes_count": 0,
                 "vigentes_weight": Decimal("0.000"),
+                "vigentes_amount": Decimal("0.00"),
+                "importe_incompleto": False,
                 "anulados_count": 0,
                 "anulados_weight": Decimal("0.000"),
             }
@@ -170,30 +185,44 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
         else:
             ws_data["vigentes_count"] += 1
             ws_data["vigentes_weight"] += w
+            if entry.amount_mxn is None:
+                ws_data["importe_incompleto"] = True
+            else:
+                ws_data["vigentes_amount"] += Decimal(str(entry.amount_mxn))
 
     total_vig_count = 0
     total_vig_weight = Decimal("0.000")
+    total_vig_amount = Decimal("0.00")
+    total_amount_incomplete = False
     total_anul_count = 0
     total_anul_weight = Decimal("0.000")
 
     worker_data_rows = 0
     row_idx = 2
-    for (assignment_id, name, barcode, slot_num), data in sorted(worker_summary.items()):
-        ws_res.cell(row=row_idx, column=1, value=_safe_text(name))
-        ws_res.cell(row=row_idx, column=2, value=_safe_text(barcode))
+    for assignment_id, data in sorted(worker_summary.items(), key=lambda item: item[0] or 0):
+        ws_res.cell(row=row_idx, column=1, value=_safe_text(data["name"]))
+        ws_res.cell(row=row_idx, column=2, value=_safe_text(data["barcode"]))
+        slot_num = data["slot_num"]
         ws_res.cell(row=row_idx, column=3, value=f"Trabajador {slot_num:03d}" if slot_num else None)
         ws_res.cell(row=row_idx, column=4, value=data["vigentes_count"])
 
         vig_cell = ws_res.cell(row=row_idx, column=5, value=data["vigentes_weight"])
         vig_cell.number_format = "0.000"
 
-        ws_res.cell(row=row_idx, column=6, value=data["anulados_count"])
+        amount_value = "N/D" if data["importe_incompleto"] else data["vigentes_amount"]
+        amount_cell = ws_res.cell(row=row_idx, column=6, value=amount_value)
+        if amount_value != "N/D":
+            amount_cell.number_format = '$#,##0.00'
 
-        anul_cell = ws_res.cell(row=row_idx, column=7, value=data["anulados_weight"])
+        ws_res.cell(row=row_idx, column=7, value=data["anulados_count"])
+
+        anul_cell = ws_res.cell(row=row_idx, column=8, value=data["anulados_weight"])
         anul_cell.number_format = "0.000"
 
         total_vig_count += data["vigentes_count"]
         total_vig_weight += data["vigentes_weight"]
+        total_vig_amount += data["vigentes_amount"]
+        total_amount_incomplete = total_amount_incomplete or data["importe_incompleto"]
         total_anul_count += data["anulados_count"]
         total_anul_weight += data["anulados_weight"]
 
@@ -210,15 +239,24 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
     tv_cell.number_format = "0.000"
     tv_cell.font = total_font
 
-    ws_res.cell(row=row_idx, column=6, value=total_anul_count).font = total_font
+    total_amount_cell = ws_res.cell(
+        row=row_idx,
+        column=6,
+        value="N/D" if total_amount_incomplete else total_vig_amount,
+    )
+    if not total_amount_incomplete:
+        total_amount_cell.number_format = '$#,##0.00'
+    total_amount_cell.font = total_font
 
-    ta_cell = ws_res.cell(row=row_idx, column=7, value=total_anul_weight)
+    ws_res.cell(row=row_idx, column=7, value=total_anul_count).font = total_font
+
+    ta_cell = ws_res.cell(row=row_idx, column=8, value=total_anul_weight)
     ta_cell.number_format = "0.000"
     ta_cell.font = total_font
 
     res_last_row = 1 + worker_data_rows if worker_data_rows else 1
     ws_res.freeze_panes = "A2"
-    ws_res.auto_filter.ref = f"A1:G{res_last_row}"
+    ws_res.auto_filter.ref = f"A1:H{res_last_row}"
     _auto_width(ws_res)
 
     buf = BytesIO()

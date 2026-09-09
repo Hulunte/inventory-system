@@ -11,6 +11,7 @@ class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     rate_per_kg = db.Column(db.Numeric(8, 2), nullable=False)
+    average_sack_weight_kg = db.Column(db.Numeric(10, 3), nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False,
@@ -25,6 +26,10 @@ class Product(db.Model):
     __table_args__ = (
         Index("ux_products_name_lower", func.lower(name), unique=True),
         CheckConstraint("rate_per_kg >= 0", name="ck_products_rate_non_negative"),
+        CheckConstraint(
+            "average_sack_weight_kg IS NULL OR average_sack_weight_kg > 0",
+            name="ck_products_average_sack_weight_positive",
+        ),
     )
 
     def __repr__(self):

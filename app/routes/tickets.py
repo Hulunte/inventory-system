@@ -222,6 +222,9 @@ def api_print_ticket():
             "rate_per_kg": line.rate_per_kg,
             "weight_kg": line.weight_kg,
             "amount_mxn": line.amount_mxn,
+            "registration_type": line.registration_type,
+            "sack_count": line.sack_count,
+            "average_sack_weight_kg": line.average_sack_weight_kg,
         })
 
     ticket_bytes = render_ticket(

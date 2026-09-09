@@ -273,7 +273,7 @@ def create_product_endpoint():
     if not data:
         return jsonify({"error": "Request body must not be empty"}), 400
 
-    KNOWN_FIELDS = {"name", "rate_per_kg"}
+    KNOWN_FIELDS = {"name", "rate_per_kg", "average_sack_weight_kg"}
     unknown = set(data.keys()) - KNOWN_FIELDS
     if unknown:
         return jsonify({"error": "Unknown fields: " + ", ".join(sorted(unknown))}), 400
@@ -289,7 +289,10 @@ def create_product_endpoint():
         return jsonify({"error": "rate_per_kg must not be null"}), 400
 
     try:
-        product = create_product(name=data["name"], rate_per_kg=data["rate_per_kg"])
+        product = create_product(
+            name=data["name"], rate_per_kg=data["rate_per_kg"],
+            average_sack_weight_kg=data.get("average_sack_weight_kg"),
+        )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except DuplicateProductError:
@@ -308,13 +311,13 @@ def update_product_endpoint(product_id):
     if not data:
         return jsonify({"error": "Request body must not be empty"}), 400
 
-    KNOWN_FIELDS = {"name", "rate_per_kg"}
+    KNOWN_FIELDS = {"name", "rate_per_kg", "average_sack_weight_kg"}
     unknown = set(data.keys()) - KNOWN_FIELDS
     if unknown:
         return jsonify({"error": "Unknown fields: " + ", ".join(sorted(unknown))}), 400
 
-    if "name" not in data and "rate_per_kg" not in data:
-        return jsonify({"error": "At least one field (name, rate_per_kg) is required"}), 400
+    if not ({"name", "rate_per_kg", "average_sack_weight_kg"} & set(data)):
+        return jsonify({"error": "At least one product field is required"}), 400
 
     if "name" in data and data["name"] is None:
         return jsonify({"error": "name must not be null"}), 400
@@ -326,6 +329,8 @@ def update_product_endpoint(product_id):
         kwargs["name"] = data["name"]
     if "rate_per_kg" in data:
         kwargs["rate_per_kg"] = data["rate_per_kg"]
+    if "average_sack_weight_kg" in data:
+        kwargs["average_sack_weight_kg"] = data["average_sack_weight_kg"]
 
     try:
         product = update_product(product_id, **kwargs)

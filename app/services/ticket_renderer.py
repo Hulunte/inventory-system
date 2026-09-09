@@ -147,6 +147,14 @@ def render_ticket(
         buf.extend(_encode(_right(amount_str, 10), encoding))
         buf.extend(b"\n")
 
+        if line_data.get("registration_type") == "sacks":
+            sacks = line_data.get("sack_count")
+            average = Decimal(str(line_data.get("average_sack_weight_kg")))
+            buf.extend(_encode(_left(f"  ARPILLAS: {sacks} | PESO ESTIMADO", cpl), encoding))
+            buf.extend(b"\n")
+            buf.extend(_encode(_left(f"  PROMEDIO: {average:.3f} kg/arpilla", cpl), encoding))
+            buf.extend(b"\n")
+
     buf.extend(_encode(_separator(cpl, "-"), encoding))
     buf.extend(b"\n")
 

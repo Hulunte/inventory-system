@@ -51,11 +51,31 @@ def _format_rate(rate):
     return str(rate.quantize(Decimal("0.01")))
 
 
+def _validate_average_sack_weight(value):
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    if isinstance(value, bool):
+        raise ValueError("average_sack_weight_kg must be a positive number")
+    try:
+        average = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError("average_sack_weight_kg must be a positive number")
+    if not average.is_finite() or average <= 0:
+        raise ValueError("average_sack_weight_kg must be greater than zero")
+    if average.as_tuple().exponent < -3:
+        raise ValueError("average_sack_weight_kg must have at most 3 decimal places")
+    return average
+
+
 def serialize_product(product):
     return {
         "id": product.id,
         "name": product.name,
         "rate_per_kg": _format_rate(product.rate_per_kg),
+        "average_sack_weight_kg": (
+            str(product.average_sack_weight_kg.quantize(Decimal("0.001")))
+            if product.average_sack_weight_kg is not None else None
+        ),
         "active": product.active,
         "created_at": product.created_at.isoformat(),
         "updated_at": product.updated_at.isoformat(),
@@ -86,9 +106,10 @@ def _is_duplicate_product_name_error(error):
     return getattr(diag, "constraint_name", None) == "ux_products_name_lower"
 
 
-def create_product(name, rate_per_kg):
+def create_product(name, rate_per_kg, average_sack_weight_kg=None):
     name = _validate_name(name)
     rate_per_kg = _validate_rate(rate_per_kg)
+    average_sack_weight_kg = _validate_average_sack_weight(average_sack_weight_kg)
 
     existing = Product.query.filter(
         func.lower(Product.name) == name.lower()
@@ -96,7 +117,7 @@ def create_product(name, rate_per_kg):
     if existing:
         raise DuplicateProductError("El producto ya existe.")
 
-    product = Product(name=name, rate_per_kg=rate_per_kg)
+    product = Product(name=name, rate_per_kg=rate_per_kg, average_sack_weight_kg=average_sack_weight_kg)
     db.session.add(product)
     try:
         db.session.commit()
@@ -108,7 +129,7 @@ def create_product(name, rate_per_kg):
     return product
 
 
-def update_product(product_id, name=None, rate_per_kg=None):
+def update_product(product_id, name=None, rate_per_kg=None, average_sack_weight_kg=...):
     product = db.session.get(Product, product_id)
     if product is None:
         return None
@@ -119,6 +140,8 @@ def update_product(product_id, name=None, rate_per_kg=None):
     if rate_per_kg is not None:
         rate_per_kg = _validate_rate(rate_per_kg)
         product.rate_per_kg = rate_per_kg
+    if average_sack_weight_kg is not ...:
+        product.average_sack_weight_kg = _validate_average_sack_weight(average_sack_weight_kg)
 
     try:
         db.session.commit()
@@ -149,20 +172,64 @@ def deactivate_product(product_id):
 
 
 def get_active_products_for_reception():
-    products = (
-        Product.query
+    from app.models.harvest_entry import HarvestEntry
+
+    sack_stats = (
+        db.session.query(
+            HarvestEntry.product_id.label("product_id"),
+            func.count(HarvestEntry.id).label("total_movements"),
+            func.coalesce(func.sum(HarvestEntry.sack_count), 0).label("total_sacks"),
+            func.coalesce(func.sum(HarvestEntry.weight_kg), 0).label("total_kg"),
+            func.coalesce(func.sum(HarvestEntry.amount_mxn), 0).label("total_amount"),
+            func.min(HarvestEntry.created_at).label("period_start"),
+            func.max(HarvestEntry.created_at).label("period_end"),
+        )
+        .filter(HarvestEntry.registration_type == "sacks", HarvestEntry.voided.is_(False))
+        .group_by(HarvestEntry.product_id)
+        .subquery()
+    )
+    rows = (
+        db.session.query(Product, sack_stats)
+        .outerjoin(sack_stats, sack_stats.c.product_id == Product.id)
         .filter(Product.active.is_(True))
         .order_by(func.lower(Product.name).asc())
         .all()
     )
-    return [
-        {
-            "id": p.id,
-            "name": p.name,
-            "rate_per_kg": _format_rate(p.rate_per_kg),
-        }
-        for p in products
-    ]
+    products = []
+    for row in rows:
+        product = row[0]
+        total_movements = int(row.total_movements or 0)
+        total_sacks = int(row.total_sacks or 0)
+        total_kg = Decimal(str(row.total_kg or 0))
+        total_amount = Decimal(str(row.total_amount or 0))
+        products.append({
+            "id": product.id,
+            "name": product.name,
+            "rate_per_kg": _format_rate(product.rate_per_kg),
+            "average_sack_weight_kg": (
+                str(product.average_sack_weight_kg.quantize(Decimal("0.001")))
+                if product.average_sack_weight_kg is not None else None
+            ),
+            "sack_statistics": {
+                "average_kg_per_movement": (
+                    str((total_kg / total_movements).quantize(Decimal("0.001")))
+                    if total_movements else None
+                ),
+                "average_kg_per_sack": (
+                    str((total_kg / total_sacks).quantize(Decimal("0.001")))
+                    if total_sacks else None
+                ),
+                "total_movements": total_movements,
+                "total_sacks": total_sacks,
+                "total_kg": str(total_kg.quantize(Decimal("0.001"))),
+                "total_amount_mxn": str(total_amount.quantize(Decimal("0.01"))),
+                "period": (
+                    f"{row.period_start.date().isoformat()} a {row.period_end.date().isoformat()}"
+                    if row.period_start and row.period_end else None
+                ),
+            },
+        })
+    return products
 
 
 def has_product_movements(product_id):

@@ -31,6 +31,11 @@ const errorRetryBtn = document.getElementById("error-retry-btn");
 const errorSkipBtn = document.getElementById("error-skip-btn");
 const errorStopBtn = document.getElementById("error-stop-btn");
 const confirmMessage = document.getElementById("confirm-message");
+const quickScanEnabled = document.getElementById("quick-scan-enabled");
+const quickScanInput = document.getElementById("quick-scan-input");
+const quickScanMessage = document.getElementById("quick-scan-message");
+const quickScanPreview = document.getElementById("quick-scan-preview");
+const quickScanDate = document.getElementById("quick-scan-date");
 
 let tickets = [];
 let selectedAssignmentId = null;
@@ -38,6 +43,8 @@ let searchTimeout = null;
 let isPrinting = false;
 let csrfToken = "";
 let printAbortController = null;
+let quickScanBusy = false;
+const quickPrintedTickets = new Set();
 
 function setInputsDisabled(disabled) {
     dateInput.disabled = disabled;
@@ -49,6 +56,8 @@ function setInputsDisabled(disabled) {
     printSelectedBtn.disabled = disabled;
     printAllAutoBtn.disabled = disabled;
     printAllConfirmBtn.disabled = disabled;
+    quickScanEnabled.disabled = disabled;
+    quickScanInput.disabled = disabled || !quickScanEnabled.checked;
 }
 
 function escapeHtml(text) {
@@ -71,7 +80,16 @@ function initDate() {
     }
 }
 
+function getOperationalDate() {
+    const configuredToday = window.TICKETS_CONFIG && window.TICKETS_CONFIG.operationalToday;
+    const date = dateInput.value || configuredToday;
+    if (date && !dateInput.value) dateInput.value = date;
+    quickScanDate.textContent = date || "No disponible";
+    return date;
+}
+
 initDate();
+getOperationalDate();
 
 function showMessage(el, text, isError) {
     el.hidden = false;
@@ -162,10 +180,17 @@ function renderTicketList() {
     html += "</tbody></table>";
     ticketList.innerHTML = html;
 
-    ticketList.querySelectorAll("input[type='radio']").forEach(radio => {
-        radio.addEventListener("change", () => {
-            selectedAssignmentId = parseInt(radio.value, 10);
-            showPreview(selectedAssignmentId);
+    ticketList.querySelectorAll(".ticket-row").forEach(row => {
+        row.addEventListener("click", () => {
+            const assignmentId = parseInt(row.dataset.id, 10);
+            if (selectedAssignmentId === assignmentId) {
+                selectedAssignmentId = null;
+                previewSection.hidden = true;
+            } else {
+                selectedAssignmentId = assignmentId;
+                showPreview(assignmentId);
+            }
+            renderTicketList();
         });
     });
 
@@ -196,7 +221,10 @@ function showPreview(assignmentId) {
 
     for (const line of ticket.product_lines) {
         const amountDisplay = line.amount_mxn !== null ? `$${line.amount_mxn}` : "N/D";
-        html += `<tr><td>${escapeHtml(line.product_name)}</td><td class="num">${line.weight_kg}</td><td class="num">$${line.rate_per_kg}</td><td class="num">${amountDisplay}</td></tr>`;
+        const type = line.registration_type === "sacks"
+            ? `Arpillas: ${line.sack_count}; estimado con ${line.average_sack_weight_kg} kg/arpilla`
+            : "Báscula: peso medido";
+        html += `<tr><td>${escapeHtml(line.product_name)}<br><small>${escapeHtml(type)}</small></td><td class="num">${line.weight_kg}</td><td class="num">$${line.rate_per_kg}</td><td class="num">${amountDisplay}</td></tr>`;
     }
 
     html += "</tbody></table>";
@@ -350,7 +378,121 @@ printSelectedBtn.addEventListener("click", async () => {
         if (!confirm("Este ticket contiene importes incompletos. Desea imprimirlo?")) return;
     }
 
-    await sendPrintRequest(date, selectedAssignmentId, printerName, ticket);
+    const result = await sendPrintRequest(
+        date,
+        selectedAssignmentId,
+        printerName,
+        ticket,
+        Boolean(ticket && ticket.has_incomplete_amounts),
+    );
+    showMessage(printerMessage, result.error || result.message, Boolean(result.error));
+});
+
+function renderQuickScanPreview(ticket) {
+    const incomplete = ticket.has_incomplete_amounts
+        ? '<div class="preview-warning">Este ticket contiene importes incompletos.</div>'
+        : "";
+    quickScanPreview.innerHTML = `<div class="preview-box">
+        <div class="preview-header"><strong>${escapeHtml(ticket.worker_name)}</strong></div>
+        <div class="preview-meta">${escapeHtml(ticket.worker_barcode)} | ${escapeHtml(ticket.slot_label)}</div>
+        <div class="preview-totals"><span>${ticket.total_weight_kg} kg</span><span class="bold">$${ticket.total_amount_mxn} MXN</span></div>
+        ${incomplete}
+    </div>`;
+    quickScanPreview.hidden = false;
+}
+
+async function processQuickScan() {
+    if (!quickScanEnabled.checked || quickScanBusy) return;
+    const barcode = quickScanInput.value.trim().toUpperCase();
+    if (!barcode) return;
+
+    quickScanBusy = true;
+    quickScanInput.disabled = true;
+    hideMessage(quickScanMessage);
+    quickScanPreview.hidden = true;
+
+    try {
+        const date = getOperationalDate();
+        if (!date) throw new Error("No fue posible determinar la fecha de operación.");
+        const response = await fetch(`/api/tickets/daily?date=${encodeURIComponent(date)}&q=${encodeURIComponent(barcode)}`);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "No fue posible consultar el ticket.");
+
+        const ticket = payload.tickets.find(item => item.worker_barcode.toUpperCase() === barcode);
+        if (!ticket) {
+            showMessage(quickScanMessage, "El trabajador no tiene movimientos en la fecha seleccionada.", true);
+            return;
+        }
+
+        renderQuickScanPreview(ticket);
+        const printerName = printerSelect.value;
+        if (!printerName) {
+            showMessage(quickScanMessage, "Configure primero una impresora", true);
+            return;
+        }
+        const duplicateKey = `${date}:${ticket.worker_assignment_id}`;
+        if (quickPrintedTickets.has(duplicateKey)) {
+            showMessage(quickScanMessage, "Este ticket ya fue impreso en esta sesión rápida.", true);
+            return;
+        }
+
+        let confirmIncomplete = false;
+        if (ticket.has_incomplete_amounts) {
+            confirmIncomplete = confirm("Este ticket contiene importes incompletos. ¿Desea imprimirlo?");
+            if (!confirmIncomplete) {
+                showMessage(quickScanMessage, "Impresión cancelada.", true);
+                return;
+            }
+        }
+
+        const result = await sendPrintRequest(
+            date,
+            ticket.worker_assignment_id,
+            printerName,
+            ticket,
+            confirmIncomplete,
+        );
+        if (result.error || result.needsConfirm) {
+            throw new Error(result.error || "Debe confirmar los importes incompletos.");
+        }
+        quickPrintedTickets.add(duplicateKey);
+        showMessage(quickScanMessage, "Ticket impreso exitosamente.", false);
+    } catch (error) {
+        showMessage(quickScanMessage, error.message || "Error inesperado al imprimir.", true);
+    } finally {
+        quickScanBusy = false;
+        quickScanInput.value = "";
+        quickScanInput.disabled = !quickScanEnabled.checked;
+        if (quickScanEnabled.checked) quickScanInput.focus();
+    }
+}
+
+quickScanEnabled.addEventListener("change", () => {
+    quickScanInput.disabled = !quickScanEnabled.checked;
+    hideMessage(quickScanMessage);
+    if (!quickScanEnabled.checked) {
+        quickScanPreview.hidden = true;
+        quickScanInput.value = "";
+        return;
+    }
+    quickScanInput.focus();
+});
+
+dateInput.addEventListener("change", getOperationalDate);
+
+if (window.location.hash === "#quick-scan-section") {
+    quickScanEnabled.checked = true;
+    quickScanInput.disabled = false;
+    requestAnimationFrame(() => {
+        document.getElementById("quick-scan-section").scrollIntoView({ behavior: "smooth", block: "center" });
+        quickScanInput.focus({ preventScroll: true });
+    });
+}
+
+quickScanInput.addEventListener("keydown", event => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    processQuickScan();
 });
 
 async function sendPrintRequest(date, assignmentId, printerName, ticket, confirmIncomplete = false) {

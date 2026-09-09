@@ -205,12 +205,12 @@ class TestEmptyPeriod:
         ws_mov = wb["Movimientos"]
         assert ws_mov.max_row == 1
         assert ws_mov.freeze_panes == "A2"
-        assert ws_mov.auto_filter.ref == "A1:M1"
+        assert ws_mov.auto_filter.ref == "A1:Q1"
 
         ws_res = wb["Resumen"]
         assert ws_res.max_row == 2
         assert ws_res.freeze_panes == "A2"
-        assert ws_res.auto_filter.ref == "A1:G1"
+        assert ws_res.auto_filter.ref == "A1:H1"
 
 
 class TestVigenteEntry:
@@ -283,8 +283,9 @@ class TestAnuladoEntry:
         assert ws.cell(row=row, column=13).value == "Duplicate entry"
 
         ws_res = wb["Resumen"]
-        assert ws_res.cell(row=2, column=6).value == 1
-        assert ws_res.cell(row=2, column=7).value == Decimal("12.000")
+        assert ws_res.cell(row=2, column=6).value == 0
+        assert ws_res.cell(row=2, column=7).value == 1
+        assert ws_res.cell(row=2, column=8).value == Decimal("12.000")
 
 
 class TestInactiveWorker:
@@ -349,15 +350,17 @@ class TestResumenTotals:
         assert worker_row is not None
         assert ws.cell(row=worker_row, column=4).value == 1
         assert ws.cell(row=worker_row, column=5).value == Decimal("20.000")
-        assert ws.cell(row=worker_row, column=6).value == 1
-        assert ws.cell(row=worker_row, column=7).value == Decimal("15.500")
+        assert ws.cell(row=worker_row, column=6).value == "N/D"
+        assert ws.cell(row=worker_row, column=7).value == 1
+        assert ws.cell(row=worker_row, column=8).value == Decimal("15.500")
 
         total_row = ws.max_row
         assert ws.cell(row=total_row, column=1).value == "TOTALES"
         assert ws.cell(row=total_row, column=4).value == 1
         assert ws.cell(row=total_row, column=5).value == Decimal("20.000")
-        assert ws.cell(row=total_row, column=6).value == 1
-        assert ws.cell(row=total_row, column=7).value == Decimal("15.500")
+        assert ws.cell(row=total_row, column=6).value == "N/D"
+        assert ws.cell(row=total_row, column=7).value == 1
+        assert ws.cell(row=total_row, column=8).value == Decimal("15.500")
 
 
 class TestDecimalWeightPrecision:
@@ -750,7 +753,7 @@ class TestAutofilterAndFreeze:
         )
         wb = load_workbook(io.BytesIO(resp.data))
         ws_res = wb["Resumen"]
-        assert ws_res.auto_filter.ref == "A1:G2"
+        assert ws_res.auto_filter.ref == "A1:H2"
         total_row = ws_res.max_row
         assert ws_res.cell(row=total_row, column=1).value == "TOTALES"
         assert str(total_row) not in ws_res.auto_filter.ref
@@ -763,11 +766,12 @@ class TestMovimientosHeaders:
         )
         wb = load_workbook(io.BytesIO(resp.data))
         ws = wb["Movimientos"]
-        headers = [ws.cell(row=1, column=c).value for c in range(1, 14)]
+        headers = [ws.cell(row=1, column=c).value for c in range(1, 18)]
         assert headers == [
             "ID", "Fecha", "Hora", "Trabajador", "Código", "Cupo",
             "Peso (kg)", "Producto", "Precio/kg", "Importe",
             "Estado", "Fecha y hora de anulación", "Motivo de anulación",
+            "Tipo de registro", "Cantidad de arpillas", "Promedio kg/arpilla", "Peso estimado",
         ]
 
 
@@ -778,10 +782,10 @@ class TestResumenHeaders:
         )
         wb = load_workbook(io.BytesIO(resp.data))
         ws = wb["Resumen"]
-        headers = [ws.cell(row=1, column=c).value for c in range(1, 8)]
+        headers = [ws.cell(row=1, column=c).value for c in range(1, 9)]
         assert headers == [
             "Trabajador", "Código", "Cupo", "Movimientos vigentes",
-            "Peso vigente (kg)", "Movimientos anulados", "Peso anulado (kg)",
+            "Peso vigente (kg)", "Importe vigente", "Movimientos anulados", "Peso anulado (kg)",
         ]
 
 
