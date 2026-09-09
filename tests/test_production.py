@@ -790,6 +790,11 @@ class TestRunPyWarnings:
             content = f.read()
         assert "debug=True" in content
 
+    def test_run_py_disables_reloader_to_avoid_stale_database_processes(self):
+        with open("run.py", encoding="utf-8") as f:
+            content = f.read()
+        assert "use_reloader=False" in content
+
     def test_run_py_has_warning(self):
         """run.py must warn about development mode."""
         with open("run.py", encoding="utf-8") as f:

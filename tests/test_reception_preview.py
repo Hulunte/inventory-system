@@ -463,11 +463,19 @@ class TestHtmlStructure:
 
     def test_preview_is_immediately_after_dynamic_weight_area(self, client):
         html = client.get("/").get_data(as_text=True)
-        product_info = html.index('id="product-info"')
-        preview = html.index('id="recent-movements"')
-        assert product_info < preview
-        between = html[product_info:preview]
-        assert "scale-section" not in between
+        assert 'class="reception-layout"' in html
+        assert 'class="reception-main"' in html
+        assert '<aside class="card recent-movements"' in html
+
+    def test_desktop_preview_uses_two_columns_and_sticky_panel(self, client):
+        css = client.get("/static/css/reception.css").get_data(as_text=True)
+        layout = css.split(".reception-layout {", 1)[1].split("}", 1)[0]
+        panel = css.split(".recent-movements {", 1)[1].split("}", 1)[0]
+        assert "grid-template-columns:" in layout
+        assert "position: sticky" in panel
+        assert "max-height: calc(100vh - 2rem)" in panel
+        assert "#movements-content" in css
+        assert "overflow-y: auto" in css
 
     def test_mobile_preview_is_compact_without_fixed_overlay(self, client):
         css = client.get("/static/css/reception.css").get_data(as_text=True)
@@ -503,7 +511,9 @@ class TestJsEvidence:
         js = resp.data.decode()
         assert "data-void-entry-id" in js
         assert "Anulación rápida" in js
-        assert "window.confirm" in js
+        assert "confirmQuickVoid" in js
+        assert "quickVoidDialog.showModal()" in js
+        assert "window.confirm" not in js
         assert '"X-CSRF-Token"' in js
         assert "unvoid" not in js.lower()
         assert "restore-entry" not in js

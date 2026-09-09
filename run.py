@@ -12,4 +12,7 @@ from app import create_app
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Keep a single development process. The Werkzeug reloader can leave stale
+    # child processes holding port 5000 on Windows, including children that
+    # inherited a different DATABASE_URL from a test run.
+    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
