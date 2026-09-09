@@ -37,6 +37,11 @@ class HarvestEntry(db.Model):
             "AND worker_barcode_snapshot IS NOT NULL AND worker_name_snapshot IS NOT NULL)",
             name="ck_harvest_entries_worker_snapshot_consistency",
         ),
+        CheckConstraint(
+            "(registration_type = 'scale' AND sack_count IS NULL AND average_sack_weight_kg_snapshot IS NULL) OR "
+            "(registration_type = 'sacks' AND sack_count > 0 AND average_sack_weight_kg_snapshot > 0)",
+            name="ck_harvest_entries_registration_type_consistency",
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -56,6 +61,9 @@ class HarvestEntry(db.Model):
     product_name_snapshot = db.Column(db.String(100), nullable=True)
     rate_per_kg_snapshot = db.Column(db.Numeric(8, 2), nullable=True)
     amount_mxn = db.Column(db.Numeric(12, 2), nullable=True)
+    registration_type = db.Column(db.String(10), nullable=False, default="scale")
+    sack_count = db.Column(db.Integer, nullable=True)
+    average_sack_weight_kg_snapshot = db.Column(db.Numeric(10, 3), nullable=True)
 
     worker_assignment_id = db.Column(
         db.Integer,

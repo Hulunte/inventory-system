@@ -2,6 +2,7 @@ const logoutBtn = document.getElementById("logout-btn");
 const productForm = document.getElementById("product-form");
 const productName = document.getElementById("product-name");
 const productRate = document.getElementById("product-rate");
+const productSackAverage = document.getElementById("product-sack-average");
 const productMessage = document.getElementById("product-message");
 const productSubmit = document.getElementById("product-submit");
 const productSearchInput = document.getElementById("product-search-input");
@@ -11,6 +12,7 @@ const editProductForm = document.getElementById("edit-product-form");
 const editProductId = document.getElementById("edit-product-id");
 const editProductName = document.getElementById("edit-product-name");
 const editProductRate = document.getElementById("edit-product-rate");
+const editProductSackAverage = document.getElementById("edit-product-sack-average");
 const editProductMessage = document.getElementById("edit-product-message");
 const editProductCancelBtn = document.getElementById("edit-product-cancel-btn");
 const editProductSaveBtn = document.getElementById("edit-product-save-btn");
@@ -92,7 +94,11 @@ productForm.addEventListener("submit", async (event) => {
         const response = await fetch("/api/admin/products", {
             method: "POST",
             headers: apiHeaders(),
-            body: JSON.stringify({ name, rate_per_kg: rate }),
+            body: JSON.stringify({
+                name,
+                rate_per_kg: rate,
+                average_sack_weight_kg: productSackAverage.value || null,
+            }),
         });
 
         const result = await response.json();
@@ -104,6 +110,7 @@ productForm.addEventListener("submit", async (event) => {
         showMessage(productMessage, `Producto "${result.name}" registrado correctamente.`, "success");
         productName.value = "";
         productRate.value = "";
+        productSackAverage.value = "";
         productName.focus();
         loadProducts();
 
@@ -179,6 +186,7 @@ function renderProduct(product) {
             <div class="worker-row__info">
                 <span class="worker-row__name">${escapeHtml(product.name)}</span>
                 <span class="worker-row__rate">$${escapeHtml(product.rate_per_kg)}/kg</span>
+                <span class="worker-row__rate">${product.average_sack_weight_kg ? `${escapeHtml(product.average_sack_weight_kg)} kg/arpilla` : "Promedio no disponible"}</span>
                 <span class="badge ${statusClass}">${statusText}</span>
             </div>
             <div class="worker-row__actions">
@@ -219,6 +227,7 @@ productList.addEventListener("click", async (event) => {
         editProductId.value = product.id;
         editProductName.value = product.name;
         editProductRate.value = product.rate_per_kg;
+        editProductSackAverage.value = product.average_sack_weight_kg || "";
         editProductMessage.hidden = true;
         editProductModal.hidden = false;
         editProductName.focus();
@@ -323,7 +332,11 @@ editProductForm.addEventListener("submit", async (event) => {
         const response = await fetch(`/api/admin/products/${id}`, {
             method: "PATCH",
             headers: apiHeaders(),
-            body: JSON.stringify({ name, rate_per_kg: rate }),
+            body: JSON.stringify({
+                name,
+                rate_per_kg: rate,
+                average_sack_weight_kg: editProductSackAverage.value || null,
+            }),
         });
 
         const result = await response.json();

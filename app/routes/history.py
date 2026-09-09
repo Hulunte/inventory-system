@@ -82,6 +82,13 @@ def assignment_entries(assignment_id):
                 "id": entry.id,
                 "weight_kg": str(entry.weight_kg),
                 "created_at": local_dt.strftime("%H:%M"),
+                "product_name": entry.product_name_snapshot,
+                "amount_mxn": str(entry.amount_mxn) if entry.amount_mxn is not None else None,
+                "registration_type": entry.registration_type,
+                "registration_type_label": "Arpillas" if entry.registration_type == "sacks" else "Báscula",
+                "sack_count": entry.sack_count,
+                "average_sack_weight_kg": str(entry.average_sack_weight_kg_snapshot) if entry.average_sack_weight_kg_snapshot is not None else None,
+                "estimated_weight": entry.registration_type == "sacks",
             }
         )
 

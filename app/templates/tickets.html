@@ -56,6 +56,27 @@
             </div>
         </section>
 
+        <section class="card quick-scan" id="quick-scan-section">
+            <div class="quick-scan__heading">
+                <div>
+                    <h2 class="card__title">Impresi&oacute;n r&aacute;pida por esc&aacute;ner</h2>
+                    <p class="quick-scan__description">Active el modo y escanee el c&oacute;digo del trabajador. La impresi&oacute;n autom&aacute;tica solo ocurre dentro de este modo.</p>
+                </div>
+                <label class="quick-scan__toggle">
+                    <input type="checkbox" id="quick-scan-enabled">
+                    <span>Activar modo</span>
+                </label>
+            </div>
+            <div class="quick-scan__controls">
+                <label class="filters__label" for="quick-scan-input">C&oacute;digo del trabajador</label>
+                <input class="filters__input" id="quick-scan-input" type="text" autocomplete="off" disabled
+                    placeholder="Escanee y presione Enter">
+                <p class="quick-scan__date">Fecha utilizada: <strong id="quick-scan-date"></strong></p>
+            </div>
+            <div id="quick-scan-message" class="printer-message" hidden></div>
+            <div id="quick-scan-preview" class="ticket-preview" hidden></div>
+        </section>
+
         <section class="card" id="stats-section" hidden>
             <div id="stats-bar" class="stats-bar"></div>
         </section>

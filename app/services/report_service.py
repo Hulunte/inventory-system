@@ -2,7 +2,7 @@ from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from flask import current_app
-from sqlalchemy import func
+from sqlalchemy import case, func
 
 from app.extensions import db
 from app.models.harvest_entry import HarvestEntry
@@ -58,6 +58,9 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
             func.count(HarvestEntry.id).label("entries_count"),
             func.coalesce(func.sum(HarvestEntry.weight_kg), 0).label("total_weight_kg"),
             func.coalesce(func.sum(HarvestEntry.amount_mxn), 0).label("total_amount_mxn"),
+            func.sum(case((HarvestEntry.registration_type == "scale", 1), else_=0)).label("scale_entries_count"),
+            func.sum(case((HarvestEntry.registration_type == "sacks", 1), else_=0)).label("sack_entries_count"),
+            func.coalesce(func.sum(case((HarvestEntry.registration_type == "sacks", HarvestEntry.sack_count), else_=0)), 0).label("total_sacks"),
         )
         .filter(
             HarvestEntry.created_at >= start_utc,
@@ -107,6 +110,9 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
                 "entries_count": r.entries_count,
                 "total_weight_kg": worker_weight_formatted,
                 "total_amount_mxn": str(worker_amount.quantize(Decimal("0.01"))),
+                "scale_entries_count": r.scale_entries_count,
+                "sack_entries_count": r.sack_entries_count,
+                "total_sacks": r.total_sacks,
             }
         )
         total_entries += r.entries_count

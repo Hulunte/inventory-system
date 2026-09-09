@@ -293,6 +293,8 @@ class TestPublicFields:
             "id", "time", "worker", "worker_assignment_id",
             "product_name", "weight_kg", "rate_per_kg", "amount_mxn", "voided",
             "can_void",
+            "registration_type", "registration_type_label", "sack_count",
+            "average_sack_weight_kg", "estimated_weight",
         }
         assert set(m.keys()) == expected_keys
         assert set(m["worker"].keys()) == {"name", "barcode", "slot_number", "slot_label"}

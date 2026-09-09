@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
+import secrets
 from flask import Blueprint, jsonify, make_response, request, session
 
 from app.exceptions import ProductUnavailableError
@@ -11,12 +12,23 @@ from app.services.harvest_service import (
     get_recent_movements,
     get_worker_by_barcode,
     register_harvest,
+    register_sack_harvest,
+    get_sack_statistics,
 )
 from app.services.product_service import get_active_products_for_reception
 
 harvest_bp = Blueprint("harvest", __name__)
 
 _ALLOWED_ENTRY_FIELDS = {"barcode", "weight_kg", "product_id"}
+
+
+def _validate_admin_csrf():
+    if not session.get("admin"):
+        return jsonify({"error": "Admin authentication required"}), 401
+    token = request.headers.get("X-CSRF-Token", "")
+    if not token or not secrets.compare_digest(token, session.get("csrf_token", "")):
+        return jsonify({"error": "CSRF token invalid"}), 403
+    return None
 
 
 def _format_snapshot_value(value):
@@ -116,6 +128,62 @@ def create_entry():
         ),
         201,
     )
+
+
+@harvest_bp.post("/api/harvest/sack-entries")
+def create_sack_entry():
+    auth_error = _validate_admin_csrf()
+    if auth_error:
+        return auth_error
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Cuerpo JSON inválido"}), 400
+    unknown = set(data) - {"barcode", "product_id", "sack_count"}
+    if unknown:
+        return jsonify({"error": f"Campos desconocidos: {', '.join(sorted(unknown))}"}), 400
+    barcode = data.get("barcode")
+    product_id = data.get("product_id")
+    sack_count = data.get("sack_count")
+    if not isinstance(barcode, str) or not barcode.strip():
+        return jsonify({"error": "barcode is required"}), 400
+    if isinstance(product_id, bool) or not isinstance(product_id, int) or product_id <= 0:
+        return jsonify({"error": "product_id must be a positive integer"}), 400
+    if isinstance(sack_count, bool) or not isinstance(sack_count, int) or sack_count <= 0:
+        return jsonify({"error": "La cantidad de arpillas debe ser un entero positivo"}), 400
+    try:
+        entry, daily_total = register_sack_harvest(barcode.strip(), sack_count, product_id)
+    except ProductUnavailableError:
+        return jsonify({"error": "El producto seleccionado ya no está disponible."}), 409
+    except WorkerUnassignedError as exc:
+        return jsonify({"error": str(exc), "code": "worker_unassigned"}), 409
+    except ValueError as exc:
+        return jsonify({"error": str(exc), "code": "average_unavailable"}), 409
+    if entry is None:
+        return jsonify({"error": "Trabajador no encontrado"}), 404
+    return jsonify({
+        "id": entry.id,
+        "worker_assignment_id": entry.worker_assignment_id,
+        "registration_type": "sacks",
+        "registration_type_label": "Arpillas",
+        "sack_count": entry.sack_count,
+        "weight_kg": str(entry.weight_kg),
+        "estimated_weight": True,
+        "average_sack_weight_kg": str(entry.average_sack_weight_kg_snapshot),
+        "amount_mxn": _format_snapshot_value(entry.amount_mxn),
+        "daily_total": str(daily_total),
+        "product_name": entry.product_name_snapshot,
+    }), 201
+
+
+@harvest_bp.get("/api/harvest/sack-statistics/<int:product_id>")
+def sack_statistics(product_id):
+    auth_error = _validate_admin_csrf()
+    if auth_error:
+        return auth_error
+    result = get_sack_statistics(product_id)
+    if result is None:
+        return jsonify({"error": "Producto no encontrado"}), 404
+    return jsonify(result)
 
 
 @harvest_bp.get("/api/harvest/daily/<barcode>")

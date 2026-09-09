@@ -1774,7 +1774,7 @@ class TestFrozenDatabaseStartup:
 
         config = AlembicConfig(str(Path(migrations_dir) / "alembic.ini"))
         config.set_main_option("script_location", migrations_dir)
-        assert ScriptDirectory.from_config(config).get_heads() == ["d1e2f3a4b5c6"]
+        assert ScriptDirectory.from_config(config).get_heads() == ["f3a4b5c6d7e8"]
 
     def test_migration_traceback_redacts_database_password(self):
         from production import _redacted_traceback

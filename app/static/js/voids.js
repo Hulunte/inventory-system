@@ -40,13 +40,14 @@ function renderActiveEntries(entries) {
     }
     activeEntriesContent.innerHTML = `
         <div class="table-scroll"><table class="detail-table">
-            <thead><tr><th>Trabajador</th><th>Código</th><th>Cupo</th><th>Producto</th>
+            <thead><tr><th>Trabajador</th><th>Código</th><th>Cupo</th><th>Producto</th><th>Tipo</th>
                 <th>Fecha y hora</th><th class="num">Peso</th><th class="num">Importe</th><th>Acción</th></tr></thead>
             <tbody>${activeEntries.map(entry => `<tr>
                 <td>${escapeHtml(entry.worker.name || "—")}</td>
                 <td class="mono">${escapeHtml(entry.worker.barcode || "—")}</td>
                 <td>${escapeHtml(entry.worker.slot_label || "—")}</td>
                 <td>${escapeHtml(entry.product_name || "—")}</td>
+                <td>${escapeHtml(entry.registration_type_label)}${entry.sack_count ? ` (${entry.sack_count} arpillas, ${escapeHtml(entry.average_sack_weight_kg)} kg/arpilla)` : ""}</td>
                 <td>${escapeHtml(activeDate.value)} ${escapeHtml(entry.created_at_local)}</td>
                 <td class="num">${escapeHtml(entry.weight_kg)} kg</td>
                 <td class="num">${entry.amount_mxn == null ? "—" : `$${escapeHtml(entry.amount_mxn)}`}</td>
@@ -79,7 +80,7 @@ async function loadVoids() {
         }
         voidsContent.innerHTML = `
             <div class="table-scroll"><table class="detail-table">
-                <thead><tr><th>Trabajador</th><th>Código</th><th>Cupo</th><th>Producto</th>
+                <thead><tr><th>Trabajador</th><th>Código</th><th>Cupo</th><th>Producto</th><th>Tipo</th>
                     <th>Fecha</th><th>Hora</th><th class="num">Peso</th><th class="num">Importe</th>
                     <th>Motivo</th><th>Fecha de anulación</th></tr></thead>
                 <tbody>${data.entries.map(entry => `<tr>
@@ -87,6 +88,7 @@ async function loadVoids() {
                     <td class="mono">${escapeHtml(entry.worker_barcode || "—")}</td>
                     <td>${escapeHtml(entry.slot_label || "—")}</td>
                     <td>${escapeHtml(entry.product_name || "—")}</td>
+                    <td>${escapeHtml(entry.registration_type_label)}${entry.sack_count ? ` (${entry.sack_count} arpillas, ${escapeHtml(entry.average_sack_weight_kg)} kg/arpilla)` : ""}</td>
                     <td>${escapeHtml(entry.date)}</td><td>${escapeHtml(entry.time)}</td>
                     <td class="num">${escapeHtml(entry.weight_kg)} kg</td>
                     <td class="num">${entry.amount_mxn == null ? "—" : `$${escapeHtml(entry.amount_mxn)}`}</td>

@@ -576,6 +576,148 @@ body {
     min-width: 0;
 }
 
+.scanner-zone__sacks {
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: #16763f;
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.sacks-mode {
+    border-left: 5px solid #16763f;
+}
+
+.sacks-mode__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.sacks-mode__header p { color: var(--clr-warning); font-weight: 700; margin-top: 0.35rem; }
+.sacks-mode__form { display: grid; gap: 0.65rem; }
+.sacks-mode__form input {
+    width: 100%; padding: 0.8rem; border: 2px solid var(--clr-border); border-radius: var(--radius-sm); font-size: 1rem;
+}
+.sacks-mode__worker, .sacks-mode__statistics { padding: 0.8rem; background: var(--clr-bg); border-radius: var(--radius-sm); }
+.sacks-mode__products { border: 0; min-width: 0; }
+.sacks-mode__products legend { margin-bottom: 0.65rem; font-weight: 700; }
+.sacks-mode .product-selector__buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.85rem;
+}
+.sacks-product-button {
+    appearance: none;
+    -webkit-appearance: none;
+    display: flex;
+    min-width: 0;
+    min-height: 76px;
+    width: 100%;
+    padding: 0.9rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.3rem;
+    color: var(--clr-primary);
+    background: #f5fbf7;
+    border: 2px solid var(--clr-primary);
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(22, 118, 63, 0.08);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, color 120ms ease;
+}
+.sacks-product-button .product-button__name { font-size: 1.05rem; font-weight: 800; line-height: 1.2; }
+.sacks-product-button .product-button__rate { font-size: 0.95rem; font-weight: 700; opacity: 0.9; }
+.sacks-product-button:hover { background: var(--clr-primary-light); box-shadow: 0 5px 12px rgba(22, 118, 63, 0.16); }
+.sacks-product-button:active { transform: translateY(1px) scale(0.99); }
+.sacks-product-button[aria-checked="true"] {
+    background: var(--clr-primary);
+    border-color: var(--clr-primary);
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(22, 118, 63, 0.2);
+}
+.sacks-product-button[aria-checked="true"]:hover { background: var(--clr-primary-hover); }
+.sacks-product-button:focus-visible { outline: 4px solid rgba(22, 118, 63, 0.28); outline-offset: 3px; }
+
+.average-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 0.55rem;
+    padding: 0.9rem;
+    color: var(--clr-text);
+    background: #f5fbf7;
+    border: 1px solid rgba(22, 118, 63, 0.3);
+    border-radius: var(--radius-sm);
+}
+.average-summary strong { grid-column: 1 / -1; color: var(--clr-primary); }
+.average-summary span { line-height: 1.35; }
+
+@media (max-width: 600px) {
+    .sacks-mode__header { flex-direction: column; }
+    .sacks-mode .product-selector__buttons { grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .sacks-product-button { min-height: 68px; padding: 0.75rem; }
+    .average-summary { grid-template-columns: 1fr 1fr; font-size: 0.9rem; }
+}
+
+@media (max-width: 380px) {
+    .sacks-mode .product-selector__buttons, .average-summary { grid-template-columns: 1fr; }
+}
+
+.scanner-zone__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+}
+
+.scanner-zone__tickets {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 8px;
+    background: #16763f;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.scanner-zone__tickets:hover,
+.scanner-zone__tickets:focus-visible {
+    background: #0f5d31;
+    outline: 3px solid rgba(22, 118, 63, 0.22);
+}
+
+.scanner-zone__tickets svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+@media (max-width: 520px) {
+    .scanner-zone__heading {
+        align-items: flex-start;
+    }
+
+    .scanner-zone__tickets {
+        padding: 0.6rem;
+    }
+
+    .scanner-zone__tickets span {
+        font-size: 0.82rem;
+    }
+}
+
 #movements-content {
     overflow-y: auto;
     overscroll-behavior: contain;

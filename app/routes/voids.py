@@ -43,6 +43,10 @@ def list_voided_entries():
                 ),
                 "void_reason": entry.void_reason,
                 "voided_at": voided_local.strftime("%d/%m/%Y %H:%M:%S"),
+                "registration_type_label": "Arpillas" if entry.registration_type == "sacks" else "Báscula",
+                "sack_count": entry.sack_count,
+                "average_sack_weight_kg": str(entry.average_sack_weight_kg_snapshot) if entry.average_sack_weight_kg_snapshot is not None else None,
+                "estimated_weight": entry.registration_type == "sacks",
             }
         )
 

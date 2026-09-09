@@ -99,6 +99,73 @@ def register_harvest(barcode, weight_kg, product_id):
     return entry, daily_total
 
 
+def register_sack_harvest(barcode, sack_count, product_id):
+    """Register an estimated movement using the product's configured sack average."""
+    _validate_product_id(product_id)
+    worker = (
+        db.session.query(Worker)
+        .filter(Worker.barcode == barcode, Worker.active.is_(True))
+        .with_for_update()
+        .one_or_none()
+    )
+    if worker is None:
+        return None, None
+    assignment = (
+        WorkerAssignment.query.filter_by(worker_id=worker.id, ended_at=None)
+        .with_for_update().one_or_none()
+    )
+    if assignment is None:
+        raise WorkerUnassignedError("Este cupo no tiene una persona asignada.")
+    product = (
+        Product.query.filter(Product.id == product_id, Product.active.is_(True))
+        .with_for_update().one_or_none()
+    )
+    if product is None:
+        raise ProductUnavailableError("El producto seleccionado ya no está disponible.")
+    if product.average_sack_weight_kg is None:
+        raise ValueError("Promedio no disponible")
+
+    average = Decimal(str(product.average_sack_weight_kg))
+    estimated_weight = (Decimal(sack_count) * average).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+    rate = Decimal(str(product.rate_per_kg))
+    amount = (estimated_weight * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    entry = HarvestEntry(
+        worker_id=worker.id,
+        worker_assignment_id=assignment.id,
+        worker_slot_number_snapshot=worker.slot_number,
+        worker_barcode_snapshot=worker.barcode,
+        worker_name_snapshot=assignment.person_name,
+        product_id=product.id,
+        product_name_snapshot=product.name,
+        rate_per_kg_snapshot=rate,
+        weight_kg=estimated_weight,
+        amount_mxn=amount,
+        registration_type="sacks",
+        sack_count=sack_count,
+        average_sack_weight_kg_snapshot=average,
+    )
+    db.session.add(entry)
+    db.session.commit()
+    return entry, get_daily_total(assignment.id)
+
+
+def get_sack_statistics(product_id):
+    from app.services.product_service import get_active_products_for_reception
+
+    product = next(
+        (item for item in get_active_products_for_reception() if item["id"] == product_id),
+        None,
+    )
+    if product is None:
+        return None
+    stats = product["sack_statistics"]
+    return {
+        "available": product["average_sack_weight_kg"] is not None,
+        "configured_average_kg_per_sack": product["average_sack_weight_kg"],
+        **stats,
+    }
+
+
 def get_daily_total(assignment_id, operational_date=None, tz=None):
     if assignment_id is None:
         return Decimal("0")
@@ -182,6 +249,11 @@ def get_recent_movements(limit=10, can_void=False):
                 else None
             ),
             "voided": entry.voided,
+            "registration_type": entry.registration_type,
+            "registration_type_label": "Arpillas" if entry.registration_type == "sacks" else "Báscula",
+            "sack_count": entry.sack_count,
+            "average_sack_weight_kg": str(entry.average_sack_weight_kg_snapshot) if entry.average_sack_weight_kg_snapshot is not None else None,
+            "estimated_weight": entry.registration_type == "sacks",
             "can_void": bool(can_void),
         })
 

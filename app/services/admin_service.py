@@ -82,6 +82,11 @@ def get_harvest_entries_for_admin(operational_date, query_filter=None, tz=None):
             "product_name": entry.product_name_snapshot,
             "rate_per_kg": str(entry.rate_per_kg_snapshot.quantize(Decimal("0.01"))) if entry.rate_per_kg_snapshot is not None else None,
             "amount_mxn": str(entry.amount_mxn.quantize(Decimal("0.01"))) if entry.amount_mxn is not None else None,
+            "registration_type": entry.registration_type,
+            "registration_type_label": "Arpillas" if entry.registration_type == "sacks" else "Báscula",
+            "sack_count": entry.sack_count,
+            "average_sack_weight_kg": str(entry.average_sack_weight_kg_snapshot) if entry.average_sack_weight_kg_snapshot is not None else None,
+            "estimated_weight": entry.registration_type == "sacks",
         }
         entries.append(entry_data)
 
