@@ -217,14 +217,18 @@ function showPreview(assignmentId) {
     let html = '<div class="preview-box">';
     html += `<div class="preview-header"><strong>${escapeHtml(ticket.slot_label)}</strong> &mdash; ${escapeHtml(ticket.worker_name)}</div>`;
     html += `<div class="preview-meta">Codigo: ${escapeHtml(ticket.worker_barcode)} | Asignacion: ${ticket.worker_assignment_id}</div>`;
-    html += '<table class="preview-table"><thead><tr><th>Producto</th><th class="num">Kg</th><th class="num">Precio/kg</th><th class="num">Subtotal</th></tr></thead><tbody>';
+    html += '<table class="preview-table"><thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Precio aplicado</th><th class="num">Subtotal</th></tr></thead><tbody>';
 
     for (const line of ticket.product_lines) {
         const amountDisplay = line.amount_mxn !== null ? `$${line.amount_mxn}` : "N/D";
         const type = line.registration_type === "sacks"
             ? `Arpillas: ${line.sack_count}; estimado con ${line.average_sack_weight_kg} kg/arpilla`
             : "Báscula: peso medido";
-        html += `<tr><td>${escapeHtml(line.product_name)}<br><small>${escapeHtml(type)}</small></td><td class="num">${line.weight_kg}</td><td class="num">$${line.rate_per_kg}</td><td class="num">${amountDisplay}</td></tr>`;
+        const quantity = line.measurement_mode === "sacks" ? `${line.sack_count} arpillas` : `${line.weight_kg} kg`;
+        const price = line.measurement_mode === "sacks"
+            ? (line.price_per_sack !== null ? `$${line.price_per_sack}/arpilla` : "N/D")
+            : (line.rate_per_kg !== null ? `$${line.rate_per_kg}/kg` : "N/D");
+        html += `<tr><td>${escapeHtml(line.product_name)}<br><small>${escapeHtml(type)}</small></td><td class="num">${quantity}</td><td class="num">${price}</td><td class="num">${amountDisplay}</td></tr>`;
     }
 
     html += "</tbody></table>";

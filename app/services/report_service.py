@@ -61,6 +61,10 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
             func.sum(case((HarvestEntry.registration_type == "scale", 1), else_=0)).label("scale_entries_count"),
             func.sum(case((HarvestEntry.registration_type == "sacks", 1), else_=0)).label("sack_entries_count"),
             func.coalesce(func.sum(case((HarvestEntry.registration_type == "sacks", HarvestEntry.sack_count), else_=0)), 0).label("total_sacks"),
+            func.coalesce(func.sum(case((HarvestEntry.registration_type == "scale", HarvestEntry.weight_kg), else_=0)), 0).label("scale_weight_kg"),
+            func.coalesce(func.sum(case((HarvestEntry.registration_type == "scale", HarvestEntry.amount_mxn), else_=0)), 0).label("scale_amount_mxn"),
+            func.coalesce(func.sum(case((HarvestEntry.registration_type == "sacks", HarvestEntry.weight_kg), else_=0)), 0).label("sack_weight_kg"),
+            func.coalesce(func.sum(case((HarvestEntry.registration_type == "sacks", HarvestEntry.amount_mxn), else_=0)), 0).label("sack_amount_mxn"),
         )
         .filter(
             HarvestEntry.created_at >= start_utc,
@@ -113,12 +117,20 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
                 "scale_entries_count": r.scale_entries_count,
                 "sack_entries_count": r.sack_entries_count,
                 "total_sacks": r.total_sacks,
+                "scale_weight_kg": _format_decimal(r.scale_weight_kg),
+                "scale_amount_mxn": str(Decimal(str(r.scale_amount_mxn)).quantize(Decimal("0.01"))),
+                "sack_weight_kg": _format_decimal(r.sack_weight_kg),
+                "sack_amount_mxn": str(Decimal(str(r.sack_amount_mxn)).quantize(Decimal("0.01"))),
             }
         )
         total_entries += r.entries_count
         total_weight += worker_weight
         total_amount += worker_amount
 
+    scale_amount = sum((Decimal(w["scale_amount_mxn"]) for w in workers_data), Decimal("0"))
+    sack_amount = sum((Decimal(w["sack_amount_mxn"]) for w in workers_data), Decimal("0"))
+    scale_weight = sum((Decimal(w["scale_weight_kg"]) for w in workers_data), Decimal("0"))
+    sack_weight = sum((Decimal(w["sack_weight_kg"]) for w in workers_data), Decimal("0"))
     return {
         "workers": workers_data,
         "summary": {
@@ -126,5 +138,7 @@ def get_harvest_report(start_date, end_date, query_filter=None, tz=None):
             "total_entries": total_entries,
             "total_weight_kg": _format_decimal(total_weight),
             "total_amount_mxn": str(total_amount.quantize(Decimal("0.01"))),
+            "scale": {"movements": sum(w["scale_entries_count"] for w in workers_data), "weight_kg": _format_decimal(scale_weight), "amount_mxn": str(scale_amount.quantize(Decimal("0.01")))},
+            "sacks": {"movements": sum(w["sack_entries_count"] for w in workers_data), "sack_count": sum(w["total_sacks"] for w in workers_data), "weight_kg": _format_decimal(sack_weight), "amount_mxn": str(sack_amount.quantize(Decimal("0.01")))},
         },
     }

@@ -7,7 +7,7 @@
 ; Build will FAIL without it.
 
 #define MyAppName "Inventory System"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Agricola Vita Santa Fe"
 #define MyAppExeName "inventory-system.exe"
 #define MyAppIcon "..\app\static\img\branding\agricola-vita-santa-fe.ico"
@@ -15,13 +15,19 @@
 #define MyDBName "inventory_db"
 #define MyDBUser "inventory_user"
 #define MyRoot ".."
+#define MyBuiltExe MyRoot + "\dist\" + MyAppExeName
 
 #expr FileExists("postgresql-installer.exe") ? 1 : !Error("Falta installer/postgresql-installer.exe")
+#expr FileExists(MyBuiltExe) ? 1 : !Error("Falta dist/inventory-system.exe; reconstruya el ejecutable antes del instalador")
+#expr GetVersionNumbersString(MyBuiltExe) == MyAppVersion + ".0" ? 1 : !Error("La version de dist/inventory-system.exe no coincide con MyAppVersion")
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+AppVerName={#MyAppName} {#MyAppVersion}
+VersionInfoVersion={#MyAppVersion}.0
+VersionInfoProductVersion={#MyAppVersion}.0
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
@@ -31,6 +37,7 @@ OutputDir=output
 OutputBaseFilename=InventorySystemSetup
 SetupIconFile={#MyAppIcon}
 UninstallDisplayIcon={#MyInstalledIcon}
+UninstallDisplayName={#MyAppName} {#MyAppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -49,7 +56,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Crear acceso directo en el escritorio"; GroupDescription: "Accesos directos:"; Flags: checkedonce
 
 [Files]
-Source: "{#MyRoot}\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MyBuiltExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyRoot}\app\static\img\branding\*"; DestDir: "{app}\static\img\branding"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MyRoot}\.env.example"; DestDir: "{app}"; Flags: ignoreversion
 Source: "setup-postgres.bat"; DestDir: "{app}\installer"; Flags: ignoreversion

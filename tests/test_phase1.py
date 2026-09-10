@@ -137,7 +137,8 @@ def test_complete_reception_load_anonymous_movement_and_quick_void(
         "id": product.id,
         "name": product.name,
         "rate_per_kg": "7.50",
-        "average_sack_weight_kg": None,
+            "average_sack_weight_kg": None,
+            "rate_per_sack": None,
         "sack_statistics": {
             "average_kg_per_movement": None,
             "average_kg_per_sack": None,
@@ -267,11 +268,11 @@ def test_reception_endpoints_return_real_movement_shape_with_modal_present(
 def test_scale_phase1_defaults_do_not_auto_open_port(monkeypatch):
     assert DEFAULT_BAUDRATE == 9600
     assert DEFAULT_BYTESIZE == 8
-    assert DEFAULT_PARITY == "N"
-    assert DEFAULT_STOPBITS == 1
+    assert DEFAULT_PARITY == "E"
+    assert DEFAULT_STOPBITS == 2
     assert DEFAULT_HANDSHAKE == "none"
     assert DEFAULT_PROFILE == "generic"
-    assert DEFAULT_TERMINATOR == "CR"
+    assert DEFAULT_TERMINATOR == "CRCRLF"
     assert DEFAULT_LINE_ENCODING == "ascii"
     monkeypatch.delenv("SCALE_PORT", raising=False)
     from app.services.scale_config import load_scale_config

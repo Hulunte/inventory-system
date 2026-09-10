@@ -47,6 +47,74 @@ def _auto_width(ws):
         ws.column_dimensions[col_letter].width = min(max(max_len + 8, 10), 50)
 
 
+def _add_separated_mode_sheets(wb, entries, tz):
+    """Add auditable mode-specific sheets without altering legacy sheets."""
+    definitions = (
+        ("scale", "Resumen báscula", "Movimientos báscula"),
+        ("sacks", "Resumen arpillas", "Movimientos arpillas"),
+    )
+    created = []
+    for mode, summary_name, movements_name in definitions:
+        mode_entries = [e for e in entries if e.registration_type == mode]
+        ws_mov = wb.create_sheet(movements_name)
+        headers = [
+            "ID", "Fecha", "Hora", "Trabajador", "Código", "Cupo", "Producto",
+            "Peso medido (kg)" if mode == "scale" else "Cantidad de arpillas",
+            "Precio/kg" if mode == "scale" else "Kg promedio/arpilla",
+            "" if mode == "scale" else "Peso estimado (kg)",
+            "" if mode == "scale" else "Precio/arpilla",
+            "Importe", "Estado",
+        ]
+        _write_header_row(ws_mov, headers)
+        for row, entry in enumerate(mode_entries, 2):
+            local = _to_local_naive(entry.created_at, tz)
+            values = [
+                entry.id, local.date(), local.time(), _safe_text(entry.worker_name_snapshot),
+                _safe_text(entry.worker_barcode_snapshot),
+                f"Trabajador {entry.worker_slot_number_snapshot:03d}" if entry.worker_slot_number_snapshot else None,
+                _safe_text(entry.product_name_snapshot),
+            ]
+            if mode == "scale":
+                values += [entry.weight_kg, entry.rate_per_kg_snapshot, None, None]
+            else:
+                values += [entry.sack_count, entry.average_sack_weight_kg_snapshot, entry.weight_kg, entry.rate_per_sack_snapshot]
+            values += [entry.amount_mxn, "Anulado" if entry.voided else "Vigente"]
+            for col, value in enumerate(values, 1):
+                ws_mov.cell(row=row, column=col, value=value)
+        ws_mov.freeze_panes = "A2"
+        ws_mov.auto_filter.ref = f"A1:M{len(mode_entries) + 1}"
+        _auto_width(ws_mov)
+
+        ws_sum = wb.create_sheet(summary_name)
+        _write_header_row(ws_sum, ["Trabajador", "Código", "Cupo", "Movimientos", "Arpillas", "Kg", "Importe"])
+        grouped = {}
+        for entry in mode_entries:
+            if entry.voided:
+                continue
+            key = entry.worker_assignment_id
+            item = grouped.setdefault(key, [entry.worker_name_snapshot, entry.worker_barcode_snapshot, entry.worker_slot_number_snapshot, 0, 0, Decimal("0"), Decimal("0")])
+            item[3] += 1
+            item[4] += entry.sack_count or 0
+            item[5] += Decimal(str(entry.weight_kg))
+            item[6] += Decimal(str(entry.amount_mxn or 0))
+        for row, (_, item) in enumerate(sorted(grouped.items(), key=lambda pair: pair[0] or 0), 2):
+            values = [item[0], item[1], f"Trabajador {item[2]:03d}" if item[2] else None, *item[3:]]
+            for col, value in enumerate(values, 1):
+                ws_sum.cell(row=row, column=col, value=value)
+        total_row = len(grouped) + 2
+        ws_sum.cell(total_row, 1, "TOTAL").font = Font(bold=True)
+        for col in range(4, 8):
+            letter = get_column_letter(col)
+            ws_sum.cell(total_row, col, f"=SUM({letter}2:{letter}{total_row - 1})").font = Font(bold=True)
+        ws_sum.freeze_panes = "A2"
+        _auto_width(ws_sum)
+        created.extend([ws_sum, ws_mov])
+
+    # Required order, while retaining legacy sheets for compatibility.
+    ordered = [wb["Resumen báscula"], wb["Resumen arpillas"], wb["Movimientos báscula"], wb["Movimientos arpillas"]]
+    wb._sheets = ordered + [sheet for sheet in wb._sheets if sheet not in ordered]
+
+
 def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
     if tz is None:
         tz = current_app.config["HARVEST_TIMEZONE"]
@@ -71,6 +139,7 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
             HarvestEntry.registration_type,
             HarvestEntry.sack_count,
             HarvestEntry.average_sack_weight_kg_snapshot,
+            HarvestEntry.rate_per_sack_snapshot,
         )
         .filter(
             HarvestEntry.created_at >= start_utc,
@@ -85,6 +154,7 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
             db.or_(
                 HarvestEntry.worker_name_snapshot.ilike(pattern),
                 HarvestEntry.worker_barcode_snapshot.ilike(pattern),
+                HarvestEntry.product_name_snapshot.ilike(pattern),
             )
         )
 
@@ -153,6 +223,51 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
     ws_mov.freeze_panes = "A2"
     ws_mov.auto_filter.ref = f"A1:{get_column_letter(len(mov_headers))}{len(entries) + 1}"
     _auto_width(ws_mov)
+
+    ws_sacks = wb.create_sheet(title="Arpillas")
+    sacks_headers = [
+        "ID", "Fecha", "Hora", "Trabajador", "Código", "Cupo", "Producto",
+        "Cantidad de arpillas", "Promedio kg/arpilla", "Peso estimado",
+        "Precio/arpilla", "Importe", "Estado",
+    ]
+    _write_header_row(ws_sacks, sacks_headers)
+
+    sack_entries = [
+        entry for entry in entries
+        if entry.registration_type == "sacks" and not entry.voided
+    ]
+    for row_idx, entry in enumerate(sack_entries, 2):
+        local_created = _to_local_naive(entry.created_at, tz)
+        values = [
+            entry.id,
+            local_created.date() if local_created else None,
+            local_created.time() if local_created else None,
+            _safe_text(entry.worker_name_snapshot),
+            _safe_text(entry.worker_barcode_snapshot),
+            f"Trabajador {entry.worker_slot_number_snapshot:03d}"
+            if entry.worker_slot_number_snapshot else None,
+            _safe_text(entry.product_name_snapshot),
+            entry.sack_count,
+            entry.average_sack_weight_kg_snapshot,
+            entry.weight_kg,
+            entry.rate_per_sack_snapshot,
+            entry.amount_mxn,
+            "Vigente",
+        ]
+        for column, value in enumerate(values, 1):
+            ws_sacks.cell(row=row_idx, column=column, value=value)
+        ws_sacks.cell(row=row_idx, column=2).number_format = "YYYY-MM-DD"
+        ws_sacks.cell(row=row_idx, column=3).number_format = "HH:MM:SS"
+        ws_sacks.cell(row=row_idx, column=9).number_format = "0.000"
+        ws_sacks.cell(row=row_idx, column=10).number_format = "0.000"
+        ws_sacks.cell(row=row_idx, column=11).number_format = "0.00"
+        ws_sacks.cell(row=row_idx, column=12).number_format = '$#,##0.00'
+
+    ws_sacks.freeze_panes = "A2"
+    ws_sacks.auto_filter.ref = (
+        f"A1:{get_column_letter(len(sacks_headers))}{len(sack_entries) + 1}"
+    )
+    _auto_width(ws_sacks)
 
     ws_res = wb.create_sheet(title="Resumen")
 
@@ -258,6 +373,8 @@ def generate_harvest_export(start_date, end_date, query_filter=None, tz=None):
     ws_res.freeze_panes = "A2"
     ws_res.auto_filter.ref = f"A1:H{res_last_row}"
     _auto_width(ws_res)
+
+    _add_separated_mode_sheets(wb, entries, tz)
 
     buf = BytesIO()
     wb.save(buf)

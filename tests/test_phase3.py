@@ -1,6 +1,8 @@
 """Phase 3: explicit, auditable sack-based harvest registration."""
+import io
 from datetime import date
 from decimal import Decimal
+from openpyxl import load_workbook
 from sqlalchemy import event
 
 import pytest
@@ -23,6 +25,7 @@ def _setup(db_session, *, average="18.500"):
     product = Product(
         name="Limón Arpillas",
         rate_per_kg=Decimal("4.25"),
+        rate_per_sack=Decimal("25.00"),
         average_sack_weight_kg=Decimal(average) if average is not None else None,
         active=True,
     )
@@ -57,8 +60,8 @@ def test_sack_product_buttons_support_selection_and_change(client):
     js = client.get("/static/js/sacks.js").get_data(as_text=True)
     assert 'class="product-button sacks-product-button"' in js
     assert 'role="radio"' in js
-    assert 'setAttribute("aria-checked", String(item === button))' in js
-    assert "selectedSacksProductId = Number(button.dataset.productId)" in js
+    assert 'setAttribute("aria-checked", String(Number(item.dataset.productId) === productId))' in js
+    assert "selectSacksProduct(Number(button.dataset.productId))" in js
 
 
 def test_active_product_endpoint_drives_sack_buttons_and_excludes_inactive(client, db_session):
@@ -80,13 +83,18 @@ def test_register_sacks_calculates_weight_amount_and_snapshots(admin_client, db_
     assert response.status_code == 201
     data = response.get_json()
     assert data["weight_kg"] == "55.500"
-    assert data["amount_mxn"] == "235.88"
+    assert data["amount_mxn"] == "75.00"
+    assert data["rate_per_sack"] == "25.00"
     assert data["estimated_weight"] is True
     entry = db.session.get(HarvestEntry, data["id"])
     assert entry.worker_assignment_id == assignment.id
     assert entry.registration_type == "sacks"
+    assert entry.measurement_mode == "sacks"
     assert entry.sack_count == 3
     assert entry.average_sack_weight_kg_snapshot == Decimal("18.500")
+    assert entry.rate_per_sack_snapshot == Decimal("25.00")
+    assert entry.price_per_sack_snapshot == Decimal("25.00")
+    assert entry.rate_per_kg_snapshot is None
     assert entry.product_name_snapshot == product.name
     assert entry.worker_barcode_snapshot == worker.barcode
 
@@ -110,7 +118,9 @@ def test_missing_average_does_not_invent_weight(admin_client, db_session):
     worker, _, product = _setup(db_session, average=None)
     response = _post(admin_client, worker, product)
     assert response.status_code == 409
-    assert response.get_json()["error"] == "Promedio no disponible"
+    assert response.get_json()["error"] == (
+        "Falta configurar el promedio kg/arpilla de este producto en Productos."
+    )
     assert HarvestEntry.query.count() == 0
 
 
@@ -131,6 +141,39 @@ def test_product_average_can_be_configured_and_validated(admin_client):
     assert invalid.status_code == 400
 
 
+def test_product_forms_have_one_average_field_each_without_sack_price(admin_client):
+    html = admin_client.get("/admin/products").get_data(as_text=True)
+    create_form = html.split('id="product-form"', 1)[1].split("</form>", 1)[0]
+    edit_form = html.split('id="edit-product-form"', 1)[1].split("</form>", 1)[0]
+    assert create_form.count('id="product-sack-average"') == 1
+    assert 'id="edit-product-sack-average"' not in create_form
+    assert edit_form.count('id="edit-product-sack-average"') == 1
+    assert 'id="product-sack-average"' not in edit_form
+    assert "Precio por kg (MXN)" in create_form
+    assert "Precio por kg (MXN)" in edit_form
+    assert create_form.count('id="product-sack-rate"') == 1
+    assert edit_form.count('id="edit-product-sack-rate"') == 1
+
+
+def test_edited_product_average_is_persisted_and_read_by_sack_mode(admin_client, db_session):
+    worker, _, product = _setup(db_session, average=None)
+    updated = admin_client.patch(
+        f"/api/admin/products/{product.id}",
+        json={"average_sack_weight_kg": "22.750"},
+        headers={"X-CSRF-Token": _csrf(admin_client)},
+    )
+    assert updated.status_code == 200
+    assert updated.get_json()["average_sack_weight_kg"] == "22.750"
+    active = admin_client.get("/api/products/active").get_json()
+    assert next(item for item in active if item["id"] == product.id)[
+        "average_sack_weight_kg"
+    ] == "22.750"
+    registered = _post(admin_client, worker, product, count=2)
+    assert registered.status_code == 201
+    assert registered.get_json()["average_sack_weight_kg"] == "22.750"
+    assert registered.get_json()["weight_kg"] == "45.500"
+
+
 def test_invalid_worker_and_product(admin_client, db_session):
     worker, _, product = _setup(db_session)
     csrf = _csrf(admin_client)
@@ -148,19 +191,27 @@ def test_invalid_worker_and_product(admin_client, db_session):
     assert missing_product.status_code == 409
 
 
-def test_worker_without_assignment_is_rejected(admin_client, db_session):
+def test_worker_without_assignment_registers_as_anonymous(admin_client, db_session):
     from tests.conftest import make_worker
+    from app.models.worker_assignment import WorkerAssignment
 
     worker = make_worker(db_session, slot_number=146)
     product = Product(
         name="Producto sin asignación", rate_per_kg=Decimal("2.00"),
+        rate_per_sack=Decimal("15.00"),
         average_sack_weight_kg=Decimal("10.000"), active=True,
     )
     db_session.add(product)
     db_session.commit()
     response = _post(admin_client, worker, product, count=1)
-    assert response.status_code == 409
-    assert response.get_json()["code"] == "worker_unassigned"
+    assert response.status_code == 201
+    entry = db.session.get(HarvestEntry, response.get_json()["id"])
+    assignment = db_session.get(WorkerAssignment, entry.worker_assignment_id)
+    assert assignment.worker_id == worker.id
+    assert assignment.person_name == "Sin nombre"
+    assert entry.worker_name_snapshot == "Sin nombre"
+    assert entry.worker_barcode_snapshot == worker.barcode
+    assert entry.worker_slot_number_snapshot == worker.slot_number
 
 
 def test_sack_statistics_are_auditable(admin_client, db_session):
@@ -204,6 +255,44 @@ def test_recent_history_report_and_ticket_separate_estimated_weight(admin_client
     ticket = serialize_daily_response(get_daily_tickets(operational_date))["tickets"][0]
     assert ticket["product_lines"][0]["registration_type_label"] == "Arpillas"
     assert ticket["product_lines"][0]["estimated_weight"] is True
+
+
+def test_export_has_filtered_active_sacks_sheet_before_summary(admin_client, db_session, app):
+    worker, _, product = _setup(db_session)
+    active_id = _post(admin_client, worker, product, count=2).get_json()["id"]
+    voided_id = _post(admin_client, worker, product, count=4).get_json()["id"]
+    admin_client.patch(
+        f"/api/admin/harvest-entries/{voided_id}/void",
+        json={"reason": "Anulación rápida"},
+        headers={"X-CSRF-Token": _csrf(admin_client)},
+    )
+    day = db_session.get(HarvestEntry, active_id).created_at.astimezone(
+        app.config["HARVEST_TIMEZONE"]
+    ).date().isoformat()
+    response = admin_client.get(
+        f"/api/reports/harvest/export?start_date={day}&end_date={day}&q=Limón%20Arpillas"
+    )
+    assert response.status_code == 200
+    workbook = load_workbook(io.BytesIO(response.data), data_only=False)
+    assert workbook.sheetnames[:4] == [
+        "Resumen báscula", "Resumen arpillas",
+        "Movimientos báscula", "Movimientos arpillas",
+    ]
+    sheet = workbook["Arpillas"]
+    assert [sheet.cell(1, col).value for col in range(1, 14)] == [
+        "ID", "Fecha", "Hora", "Trabajador", "Código", "Cupo", "Producto",
+        "Cantidad de arpillas", "Promedio kg/arpilla", "Peso estimado",
+        "Precio/arpilla", "Importe", "Estado",
+    ]
+    assert sheet.max_row == 2
+    assert sheet.cell(2, 1).value == active_id
+    assert sheet.cell(2, 4).value == "Persona Arpillas"
+    assert sheet.cell(2, 7).value == product.name
+    assert sheet.cell(2, 8).value == 2
+    assert sheet.cell(2, 9).value == 18.5
+    assert sheet.cell(2, 10).value == 37
+    assert sheet.cell(2, 11).value == 25
+    assert sheet.cell(2, 13).value == "Vigente"
 
 
 def test_real_product_and_recent_endpoints_serialize_without_500(client, db_session):
@@ -250,6 +339,7 @@ def test_scale_entries_remain_measured(db_session):
     db_session.add(entry)
     db_session.commit()
     assert entry.registration_type == "scale"
+    assert entry.measurement_mode == "scale"
     assert entry.sack_count is None
     assert entry.average_sack_weight_kg_snapshot is None
 
@@ -308,6 +398,43 @@ def test_sacks_script_prevents_double_submit_and_never_uses_scale(client):
     assert 'fetch("/api/products/active")' not in js
     assert "window.receptionProductsReady" in js
     assert "sack-statistics/" not in js
+
+
+def test_sacks_product_persists_and_valid_worker_focuses_count(client):
+    js = client.get("/static/js/sacks.js").get_data(as_text=True)
+    assert 'SACKS_PRODUCT_STORAGE_KEY = "inventory.sacksProductId"' in js
+    assert "localStorage.setItem(SACKS_PRODUCT_STORAGE_KEY" in js
+    assert "localStorage.getItem(SACKS_PRODUCT_STORAGE_KEY)" in js
+    assert "sacksCount.focus({ preventScroll: true })" in js
+    assert 'data.person_name || "Sin nombre"' in js
+    assert 'data.person_name === "Sin nombre"' not in js
+
+
+def test_sack_enter_and_button_share_the_form_submission(client):
+    html = client.get("/").get_data(as_text=True)
+    js = client.get("/static/js/sacks.js").get_data(as_text=True)
+    assert 'type="button" class="btn btn--primary" id="sacks-submit"' in html
+    assert ">Registrar cantidad</button>" in html
+    assert "async function submitSackEntry()" in js
+    assert 'sacksForm.addEventListener("submit"' in js
+    assert 'sacksCount.addEventListener("keydown"' in js
+    assert 'if (event.key !== "Enter") return' in js
+    assert 'sacksSubmit.addEventListener("click"' in js
+    assert js.count("sacksForm.requestSubmit()") == 2
+    assert js.count('fetch("/api/harvest/sack-entries"') == 1
+
+
+def test_sack_frontend_validates_configured_average_and_reports_http_error(client):
+    js = client.get("/static/js/sacks.js").get_data(as_text=True)
+    assert "selectedProduct?.average_sack_weight_kg" in js
+    assert "Falta configurar el promedio kg/arpilla de este producto en Productos." in js
+    assert 'response.headers.get("content-type")' in js
+    assert "HTTP ${response.status}" in js
+
+
+def test_sack_products_are_before_worker_barcode(client):
+    html = client.get("/").get_data(as_text=True)
+    assert html.index('id="sacks-product-buttons"') < html.index('id="sacks-barcode"')
 
 
 def test_sack_product_buttons_have_responsive_non_native_states(client):

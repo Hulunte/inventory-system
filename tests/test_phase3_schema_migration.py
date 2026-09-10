@@ -61,7 +61,7 @@ def test_reconciliation_migrates_a_stamped_legacy_postgresql_schema():
                 c["name"] for c in inspect(engine).get_columns("products")
             }
             assert {
-                "registration_type", "sack_count", "average_sack_weight_kg_snapshot"
+                "registration_type", "sack_count", "average_sack_weight_kg_snapshot", "rate_per_sack_snapshot"
             } <= {c["name"] for c in inspect(engine).get_columns("harvest_entries")}
 
             with engine.connect() as connection:
@@ -72,8 +72,9 @@ def test_reconciliation_migrates_a_stamped_legacy_postgresql_schema():
                     "SELECT average_sack_weight_kg FROM products "
                     "WHERE name = 'Producto anterior'"
                 )).scalar_one()
-            assert revision_after == "f3a4b5c6d7e8"
+            assert revision_after == "b5c6d7e8f9a0"
             assert old_average is None
+            assert "rate_per_sack" in {c["name"] for c in inspect(engine).get_columns("products")}
 
     finally:
         with app.app_context():
@@ -93,4 +94,16 @@ def test_reconciliation_is_conditional_and_non_destructive():
     assert 'if "registration_type" not in entry_columns' in migration
     assert 'if "sack_count" not in entry_columns' in migration
     assert 'if "average_sack_weight_kg_snapshot" not in entry_columns' in migration
+    assert "def downgrade():" in migration
+
+
+def test_price_separation_migration_is_reversible_and_does_not_rewrite_rows():
+    migration = (
+        __import__("pathlib").Path(MIGRATIONS_DIR)
+        / "versions" / "b5c6d7e8f9a0_separate_scale_and_sack_pricing.py"
+    ).read_text(encoding="utf-8")
+    assert "UPDATE harvest_entries" not in migration
+    assert "DELETE" not in migration
+    assert "registration_type = 'scale'" in migration
+    assert "registration_type = 'sacks'" in migration
     assert "def downgrade():" in migration

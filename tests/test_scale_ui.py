@@ -57,6 +57,13 @@ class TestReceptionPageScaleSection:
         html = resp.data.decode()
         assert 'id="scale-connection-status"' in html
 
+    def test_scale_autofill_is_visible_and_disabled_initially(self, admin_client):
+        html = admin_client.get("/").data.decode()
+        assert "Autorrellenar peso de b" in html
+        assert 'id="scale-autofill-weight"' in html
+        assert 'id="scale-autofill-weight" class="scale-select" disabled' in html
+        assert '<option value="on" selected>Activado</option>' in html
+
 
 class TestScaleJs:
     def test_js_file_loads(self, client):
@@ -131,6 +138,63 @@ class TestScaleJs:
         resp = client.get("/static/js/scale.js")
         js = resp.data.decode()
         assert "parseFloat" not in js
+
+    def test_autofill_targets_only_weight_after_valid_worker(self, client):
+        js = client.get("/static/js/scale.js").data.decode()
+        reception_js = client.get("/static/js/reception.js").data.decode()
+        assert 'document.getElementById("weight_kg")' in js
+        assert 'getElementById("barcode")' not in js
+        assert 'window.addEventListener("inventory:worker-validated"' in js
+        assert 'new CustomEvent("inventory:worker-validated")' in reception_js
+
+    def test_autofill_requires_stable_fresh_reading(self, client):
+        js = client.get("/static/js/scale.js").data.decode()
+        assert "lastStable" in js
+        assert "MAX_AUTOFILL_AGE_MS" in js
+        assert "Date.now() - lastReadingAt.getTime()" in js
+        assert "!autofillEnabled" in js
+
+    def test_realtime_updates_reuse_single_polling_loop(self, client):
+        js = client.get("/static/js/scale.js").data.decode()
+        assert "if (pollInterval) return" in js
+        assert js.count('window.addEventListener("inventory:worker-validated"') == 1
+        assert "fillWeightIfEnabled();" in js
+
+    def test_successful_registration_clears_weight_and_preserves_autofill(self, client):
+        js = client.get("/static/js/scale.js").data.decode()
+        reception_js = client.get("/static/js/reception.js").data.decode()
+        assert 'new CustomEvent("inventory:movement-registered")' in reception_js
+        handler = js[js.index("function handleMovementRegistered()"):
+                     js.index("function changeAutofillPreference()")]
+        assert 'weightInput.value = ""' in handler
+        assert 'autofillSelect.value = "off"' not in handler
+        assert "resetAutofill();" in handler
+
+    def test_autofill_preference_persists_for_next_worker_in_session(self, client):
+        js = client.get("/static/js/scale.js").data.decode()
+        assert 'var AUTOFILL_STORAGE_KEY = "inventory.scaleAutofillWeight"' in js
+        assert "sessionStorage.getItem(AUTOFILL_STORAGE_KEY)" in js
+        assert "sessionStorage.setItem(AUTOFILL_STORAGE_KEY" in js
+        assert 'autofillEnabled = autofillSelect.value === "on"' in js
+        assert js.count('window.addEventListener("inventory:worker-validated"') == 1
+        assert js.count('autofillSelect.addEventListener("change"') == 1
+
+    def test_autofill_defaults_on_but_respects_manual_session_choice(self, client):
+        js = client.get("/static/js/scale.js").data.decode()
+        assert "storedAutofillPreference === null" in js
+        assert '? true' in js
+        assert 'storedAutofillPreference === "on"' in js
+        assert 'autofillSelect.value = autofillEnabled ? "on" : "off"' in js
+
+    def test_invalid_worker_disables_control_without_changing_preference(self, client):
+        js = client.get("/static/js/scale.js").data.decode()
+        reset = js[js.index("function resetAutofill()"):
+                   js.index("function readingIsFreshAndStable()")]
+        assert "workerIsValid = false" in reset
+        assert "autofillSelect.disabled = true" in reset
+        assert "autofillEnabled = false" not in reset
+        assert "sessionStorage.setItem" not in reset
+        assert "autofillSelect.value" not in reset
 
 
 class TestReceptionPageHasScaleScript:

@@ -49,21 +49,19 @@
                             required maxlength="100">
                     </div>
                     <div class="form__group">
-                        <label class="form__label" for="product-sack-average">Kg promedio por arpilla</label>
-                        <input class="form__input" type="number" id="product-sack-average"
-                            placeholder="Opcional" step="0.001" min="0.001" inputmode="decimal">
-                    </div>
-
-                    <div class="form__group">
                         <label class="form__label" for="product-rate">Precio por kg (MXN)</label>
                         <input class="form__input" type="number" id="product-rate"
                             placeholder="0.00" step="0.01" min="0" max="999999.99"
                             inputmode="decimal" autocomplete="off" required>
                     </div>
                     <div class="form__group">
-                        <label class="form__label" for="edit-product-sack-average">Kg promedio por arpilla</label>
-                        <input class="form__input" type="number" id="edit-product-sack-average"
-                            step="0.001" min="0.001" inputmode="decimal">
+                        <label class="form__label" for="product-sack-average">Kg promedio por arpilla (opcional)</label>
+                        <input class="form__input" type="number" id="product-sack-average"
+                            placeholder="Ej. 20.000" step="0.001" min="0.001" inputmode="decimal">
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="product-sack-rate">Precio por arpilla (MXN, opcional)</label>
+                        <input class="form__input" type="number" id="product-sack-rate" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
                     </div>
                 </div>
 
@@ -109,6 +107,16 @@
                         <input class="form__input" type="number" id="edit-product-rate"
                             step="0.01" min="0" max="999999.99" inputmode="decimal" autocomplete="off" required>
                     </div>
+                    <div class="form__group">
+                        <label class="form__label" for="edit-product-sack-average">Kg promedio por arpilla (opcional)</label>
+                        <input class="form__input" type="number" id="edit-product-sack-average"
+                            placeholder="Ej. 20.000"
+                            step="0.001" min="0.001" inputmode="decimal">
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="edit-product-sack-rate">Precio por arpilla (MXN, opcional)</label>
+                        <input class="form__input" type="number" id="edit-product-sack-rate" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+                    </div>
                 </div>
                 <div id="edit-product-message" class="form__message" hidden></div>
                 <div class="modal__actions">
@@ -119,7 +127,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/products.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/products.js', v='20260909-2') }}"></script>
     <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
 </body>
 

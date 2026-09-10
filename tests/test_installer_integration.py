@@ -6,6 +6,23 @@ ISS = (ROOT / "installer" / "inventory-system.iss").read_text(encoding="utf-8")
 BAT = (ROOT / "installer" / "setup-postgres.bat").read_text(encoding="utf-8")
 
 
+def test_distribution_version_is_consistent_and_installer_checks_built_exe():
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
+    version_info = (ROOT / "version_info.txt").read_text(encoding="utf-8")
+
+    assert 'version = "1.0.1"' in pyproject
+    assert '#define MyAppVersion "1.0.1"' in ISS
+    assert "AppVerName={#MyAppName} {#MyAppVersion}" in ISS
+    assert "UninstallDisplayName={#MyAppName} {#MyAppVersion}" in ISS
+    assert "VersionInfoVersion={#MyAppVersion}.0" in ISS
+    assert "GetVersionNumbersString(MyBuiltExe)" in ISS
+    assert 'MyAppVersion + ".0"' in ISS
+    assert 'version=\'version_info.txt\'' in spec
+    assert "filevers=(1, 0, 1, 0)" in version_info
+    assert "prodvers=(1, 0, 1, 0)" in version_info
+
+
 def test_postgres_service_detection_supports_registry_and_versions_14_to_18():
     assert "SOFTWARE\\PostgreSQL\\Installations" in ISS
     assert "Service ID" in ISS
@@ -85,6 +102,11 @@ def test_pyinstaller_includes_dynamic_alembic_logging_dependency():
     spec = (ROOT / "build.spec").read_text(encoding="utf-8")
     assert "'logging.config'" in spec
     assert "('migrations', 'migrations')" in spec
+
+
+def test_installer_packages_current_exe_and_migration_tree():
+    assert 'Source: "{#MyBuiltExe}"; DestDir: "{app}"' in ISS
+    assert 'Source: "{#MyRoot}\\migrations\\*"; DestDir: "{app}\\migrations"' in ISS
 
 
 def test_batch_uses_exact_service_and_handles_paths_with_spaces():

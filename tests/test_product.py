@@ -294,7 +294,7 @@ class TestSerializeProduct:
         product = create_product(name="Chile", rate_per_kg=Decimal("4.75"))
         result = serialize_product(product)
         assert set(result.keys()) == {
-            "id", "name", "rate_per_kg", "average_sack_weight_kg", "active", "created_at", "updated_at"
+            "id", "name", "rate_per_kg", "rate_per_sack", "average_sack_weight_kg", "active", "created_at", "updated_at"
         }
 
 

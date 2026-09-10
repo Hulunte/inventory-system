@@ -273,7 +273,7 @@ def create_product_endpoint():
     if not data:
         return jsonify({"error": "Request body must not be empty"}), 400
 
-    KNOWN_FIELDS = {"name", "rate_per_kg", "average_sack_weight_kg"}
+    KNOWN_FIELDS = {"name", "rate_per_kg", "average_sack_weight_kg", "rate_per_sack"}
     unknown = set(data.keys()) - KNOWN_FIELDS
     if unknown:
         return jsonify({"error": "Unknown fields: " + ", ".join(sorted(unknown))}), 400
@@ -292,6 +292,7 @@ def create_product_endpoint():
         product = create_product(
             name=data["name"], rate_per_kg=data["rate_per_kg"],
             average_sack_weight_kg=data.get("average_sack_weight_kg"),
+            rate_per_sack=data.get("rate_per_sack"),
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -311,12 +312,12 @@ def update_product_endpoint(product_id):
     if not data:
         return jsonify({"error": "Request body must not be empty"}), 400
 
-    KNOWN_FIELDS = {"name", "rate_per_kg", "average_sack_weight_kg"}
+    KNOWN_FIELDS = {"name", "rate_per_kg", "average_sack_weight_kg", "rate_per_sack"}
     unknown = set(data.keys()) - KNOWN_FIELDS
     if unknown:
         return jsonify({"error": "Unknown fields: " + ", ".join(sorted(unknown))}), 400
 
-    if not ({"name", "rate_per_kg", "average_sack_weight_kg"} & set(data)):
+    if not ({"name", "rate_per_kg", "average_sack_weight_kg", "rate_per_sack"} & set(data)):
         return jsonify({"error": "At least one product field is required"}), 400
 
     if "name" in data and data["name"] is None:
@@ -331,6 +332,8 @@ def update_product_endpoint(product_id):
         kwargs["rate_per_kg"] = data["rate_per_kg"]
     if "average_sack_weight_kg" in data:
         kwargs["average_sack_weight_kg"] = data["average_sack_weight_kg"]
+    if "rate_per_sack" in data:
+        kwargs["rate_per_sack"] = data["rate_per_sack"]
 
     try:
         product = update_product(product_id, **kwargs)

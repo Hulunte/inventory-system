@@ -1,0 +1,27 @@
+# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        u'040904B0',
+        [StringStruct(u'CompanyName', u'Agricola Vita Santa Fe'),
+         StringStruct(u'FileDescription', u'Inventory System'),
+         StringStruct(u'FileVersion', u'1.0.1'),
+         StringStruct(u'InternalName', u'inventory-system'),
+         StringStruct(u'OriginalFilename', u'inventory-system.exe'),
+         StringStruct(u'ProductName', u'Inventory System'),
+         StringStruct(u'ProductVersion', u'1.0.1')])
+    ]),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)

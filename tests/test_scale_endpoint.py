@@ -62,8 +62,10 @@ class TestScalePortsEndpoint:
     def test_empty_ports_ui_does_not_claim_session_expired(self, client):
         javascript = client.get("/static/js/scale.js").get_data(as_text=True)
         assert 'no_serial_ports: "No hay puertos disponibles"' in javascript
-        assert "Sesion expirada" not in javascript
-        assert "Sesión expirada" not in javascript
+        load_ports = javascript.split("async function loadPorts()", 1)[1].split(
+            "async function connect()", 1
+        )[0]
+        assert "Sesión expirada" not in load_ports
 
     def test_anonymous_initialization_only_fetches_public_ports(self, client):
         javascript = client.get("/static/js/scale.js").get_data(as_text=True)
@@ -73,6 +75,15 @@ class TestScalePortsEndpoint:
         assert 'await loadPorts()' in init_body
         assert 'apiCall("GET", "/api/scale/status")' not in init_body
         assert "initCsrfToken" not in javascript
+
+    def test_protected_actions_refresh_current_session_csrf(self, client):
+        javascript = client.get("/static/js/scale.js").get_data(as_text=True)
+        assert 'fetch("/api/admin/session"' in javascript
+        assert 'cache: "no-store"' in javascript
+        assert 'credentials: "same-origin"' in javascript
+        assert 'apiCall("POST", "/api/scale/connect", {' in javascript
+        assert "automatic_read: automaticRead" in javascript
+        assert 'apiCall("POST", "/api/scale/disconnect", undefined, true)' in javascript
 
 
 class TestScaleStatusEndpoint:
@@ -129,6 +140,15 @@ class TestScaleConnectEndpoint:
     def test_no_csrf_returns_403(self, admin_client):
         resp = admin_client.post("/api/scale/connect", json={"port": "COM7"})
         assert resp.status_code == 403
+
+    def test_stale_csrf_returns_403(self, admin_client):
+        resp = admin_client.post(
+            "/api/scale/connect",
+            json={"port": "COM7"},
+            headers={"X-CSRF-Token": "token-de-otra-sesion"},
+        )
+        assert resp.status_code == 403
+        assert resp.get_json()["error"] == "CSRF token invalid"
 
     def test_missing_port(self, admin_client):
         csrf = _get_csrf(admin_client)
@@ -209,6 +229,37 @@ class TestScaleDisconnectEndpoint:
             headers={"X-CSRF-Token": csrf},
         )
         assert resp.status_code == 409
+
+
+class TestScaleReadControlEndpoints:
+    @patch("app.routes.scale.get_scale_service")
+    def test_single_read_sends_request(self, get_service, admin_client):
+        svc = get_service.return_value
+        svc.connected = True
+        svc.get_status.return_value = {"connected": True, "automatic_read": False}
+        response = admin_client.post(
+            "/api/scale/read", headers={"X-CSRF-Token": _get_csrf(admin_client)}
+        )
+        assert response.status_code == 200
+        svc.request_weight.assert_called_once_with()
+
+    @patch("app.routes.scale.get_scale_service")
+    def test_automatic_mode_is_protected_and_enabled(self, get_service, admin_client):
+        svc = get_service.return_value
+        svc.connected = True
+        svc.get_status.return_value = {"connected": True, "automatic_read": True}
+        response = admin_client.post(
+            "/api/scale/automatic",
+            json={"enabled": True},
+            headers={"X-CSRF-Token": _get_csrf(admin_client)},
+        )
+        assert response.status_code == 200
+        svc.set_automatic_read.assert_called_once_with(True)
+        svc.request_weight.assert_called_once_with()
+
+    def test_single_read_requires_admin_and_csrf(self, client, admin_client):
+        assert client.post("/api/scale/read").status_code == 401
+        assert admin_client.post("/api/scale/read").status_code == 403
 
 
 class TestScaleTestEndpoint:

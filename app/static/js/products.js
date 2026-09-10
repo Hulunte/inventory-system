@@ -3,6 +3,7 @@ const productForm = document.getElementById("product-form");
 const productName = document.getElementById("product-name");
 const productRate = document.getElementById("product-rate");
 const productSackAverage = document.getElementById("product-sack-average");
+const productSackRate = document.getElementById("product-sack-rate");
 const productMessage = document.getElementById("product-message");
 const productSubmit = document.getElementById("product-submit");
 const productSearchInput = document.getElementById("product-search-input");
@@ -13,6 +14,7 @@ const editProductId = document.getElementById("edit-product-id");
 const editProductName = document.getElementById("edit-product-name");
 const editProductRate = document.getElementById("edit-product-rate");
 const editProductSackAverage = document.getElementById("edit-product-sack-average");
+const editProductSackRate = document.getElementById("edit-product-sack-rate");
 const editProductMessage = document.getElementById("edit-product-message");
 const editProductCancelBtn = document.getElementById("edit-product-cancel-btn");
 const editProductSaveBtn = document.getElementById("edit-product-save-btn");
@@ -98,6 +100,7 @@ productForm.addEventListener("submit", async (event) => {
                 name,
                 rate_per_kg: rate,
                 average_sack_weight_kg: productSackAverage.value || null,
+                rate_per_sack: productSackRate.value || null,
             }),
         });
 
@@ -111,6 +114,7 @@ productForm.addEventListener("submit", async (event) => {
         productName.value = "";
         productRate.value = "";
         productSackAverage.value = "";
+        productSackRate.value = "";
         productName.focus();
         loadProducts();
 
@@ -187,6 +191,7 @@ function renderProduct(product) {
                 <span class="worker-row__name">${escapeHtml(product.name)}</span>
                 <span class="worker-row__rate">$${escapeHtml(product.rate_per_kg)}/kg</span>
                 <span class="worker-row__rate">${product.average_sack_weight_kg ? `${escapeHtml(product.average_sack_weight_kg)} kg/arpilla` : "Promedio no disponible"}</span>
+                <span class="worker-row__rate">${product.rate_per_sack !== null ? `$${escapeHtml(product.rate_per_sack)}/arpilla` : "Precio por arpilla no configurado"}</span>
                 <span class="badge ${statusClass}">${statusText}</span>
             </div>
             <div class="worker-row__actions">
@@ -228,6 +233,7 @@ productList.addEventListener("click", async (event) => {
         editProductName.value = product.name;
         editProductRate.value = product.rate_per_kg;
         editProductSackAverage.value = product.average_sack_weight_kg || "";
+        editProductSackRate.value = product.rate_per_sack || "";
         editProductMessage.hidden = true;
         editProductModal.hidden = false;
         editProductName.focus();
@@ -336,6 +342,7 @@ editProductForm.addEventListener("submit", async (event) => {
                 name,
                 rate_per_kg: rate,
                 average_sack_weight_kg: editProductSackAverage.value || null,
+                rate_per_sack: editProductSackRate.value || null,
             }),
         });
 

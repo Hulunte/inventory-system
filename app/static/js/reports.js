@@ -125,43 +125,51 @@ async function loadReport() {
             return;
         }
 
-        summaryContent.innerHTML = `
+        const modeTable = (title, mode) => {
+            const isSacks = mode === "sacks";
+            const rows = data.workers.filter(w => (isSacks ? w.sack_entries_count : w.scale_entries_count) > 0);
+            const totals = data.summary[mode];
+            return `<section class="report-mode-section" data-measurement-mode="${mode}">
+                <h3>${title}</h3>
             <table class="summary-table">
                 <thead>
                     <tr>
                         <th>Cupo</th>
                         <th>Trabajador</th>
                         <th>Código</th>
-                        <th class="num">Tandas</th>
-                        <th class="num">Báscula / Arpillas</th>
-                        <th class="num">Total kg</th>
+                        <th class="num">Movimientos</th>
+                        ${isSacks ? '<th class="num">Arpillas</th>' : ''}
+                        <th class="num">${isSacks ? 'Peso estimado' : 'Peso medido'} (kg)</th>
                         <th class="num">Importe</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${data.workers.map(w => `
+                    ${rows.map(w => `
                         <tr>
                             <td>${w.slot_label ? escapeHtml(w.slot_label) : "—"}</td>
                             <td>${w.name ? escapeHtml(w.name) : "Sin asignar"}</td>
                             <td class="mono">${w.barcode ? escapeHtml(w.barcode) : "—"}</td>
-                            <td class="num">${w.entries_count}</td>
-                            <td class="num">${w.scale_entries_count} / ${w.sack_entries_count} (${w.total_sacks} arpillas)</td>
-                            <td class="num bold">${w.total_weight_kg}</td>
-                            <td class="num bold">$${w.total_amount_mxn}</td>
+                            <td class="num">${isSacks ? w.sack_entries_count : w.scale_entries_count}</td>
+                            ${isSacks ? `<td class="num">${w.total_sacks}</td>` : ''}
+                            <td class="num bold">${isSacks ? w.sack_weight_kg : w.scale_weight_kg}</td>
+                            <td class="num bold">$${isSacks ? w.sack_amount_mxn : w.scale_amount_mxn}</td>
                         </tr>
                     `).join("")}
                 </tbody>
                 <tfoot>
                     <tr class="summary-total">
                         <td colspan="3">TOTAL</td>
-                        <td class="num">${data.summary.total_entries}</td>
-                        <td></td>
-                        <td class="num bold">${data.summary.total_weight_kg}</td>
-                        <td class="num bold">$${data.summary.total_amount_mxn}</td>
+                        <td class="num">${totals.movements}</td>
+                        ${isSacks ? `<td class="num">${totals.sack_count}</td>` : ''}
+                        <td class="num bold">${totals.weight_kg}</td>
+                        <td class="num bold">$${totals.amount_mxn}</td>
                     </tr>
                 </tfoot>
-            </table>
-        `;
+            </table></section>`;
+        };
+        summaryContent.innerHTML = modeTable("Movimientos de báscula", "scale")
+            + modeTable("Movimientos de arpillas", "sacks")
+            + `<p class="summary-grand-total"><strong>Totales generales:</strong> ${data.summary.total_entries} movimientos · ${data.summary.total_weight_kg} kg · $${data.summary.total_amount_mxn}</p>`;
 
     } catch (error) {
         summaryContent.innerHTML = `<p class="empty-state empty-state--error">${escapeHtml(error.message)}</p>`;

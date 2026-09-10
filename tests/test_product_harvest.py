@@ -444,7 +444,7 @@ class TestActiveProductsEndpoint:
         assert len(data) == 1
         product = data[0]
         assert set(product.keys()) == {
-            "id", "name", "rate_per_kg", "average_sack_weight_kg", "sack_statistics"
+            "id", "name", "rate_per_kg", "rate_per_sack", "average_sack_weight_kg", "sack_statistics"
         }
 
     def test_no_auth_required(self, client, db_session):

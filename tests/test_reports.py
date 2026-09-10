@@ -76,8 +76,57 @@ class TestHarvestReport:
     def test_reports_frontend_renders_amount_column(self, client):
         source = client.get("/static/js/reports.js").get_data(as_text=True)
         assert '<th class="num">Importe</th>' in source
-        assert "w.total_amount_mxn" in source
+        assert "w.scale_amount_mxn" in source
+        assert "w.sack_amount_mxn" in source
         assert "data.summary.total_amount_mxn" in source
+
+    def test_scale_count_and_real_sack_quantity_are_not_mixed(self, db_session, app, client):
+        tz = app.config["HARVEST_TIMEZONE"]
+        today = datetime.now(tz).date()
+        start = datetime.combine(today, datetime.min.time(), tzinfo=tz).astimezone(timezone.utc)
+        worker, assignment = make_worker_with_assignment(db_session, name="Resumen cantidades")
+        product = Product(
+            name="Producto resumen cantidades",
+            rate_per_kg=Decimal("2.00"),
+            average_sack_weight_kg=Decimal("10.000"),
+        )
+        db_session.add(product)
+        db_session.flush()
+        common = {
+            "worker_id": worker.id,
+            "worker_assignment_id": assignment.id,
+            "worker_slot_number_snapshot": worker.slot_number,
+            "worker_barcode_snapshot": worker.barcode,
+            "worker_name_snapshot": assignment.person_name,
+            "product_id": product.id,
+            "product_name_snapshot": product.name,
+            "rate_per_kg_snapshot": Decimal("2.00"),
+        }
+        db_session.add(HarvestEntry(
+            **common, registration_type="scale", weight_kg=Decimal("5.000"),
+            amount_mxn=Decimal("10.00"), created_at=start + timedelta(hours=8),
+        ))
+        for offset, sacks in enumerate((3, 4), start=9):
+            db_session.add(HarvestEntry(
+                **common, registration_type="sacks", sack_count=sacks,
+                average_sack_weight_kg_snapshot=Decimal("10.000"),
+                weight_kg=Decimal(sacks * 10), amount_mxn=Decimal(sacks * 20),
+                created_at=start + timedelta(hours=offset),
+            ))
+        db_session.commit()
+
+        worker_summary = get_harvest_report(today, today, "Resumen cantidades", tz)["workers"][0]
+        assert worker_summary["entries_count"] == 3
+        assert worker_summary["scale_entries_count"] == 1
+        assert worker_summary["sack_entries_count"] == 2
+        assert worker_summary["total_sacks"] == 7
+
+        source = client.get("/static/js/reports.js").get_data(as_text=True)
+        assert "w.scale_entries_count" in source
+        assert "w.total_sacks" in source
+        assert "Movimientos de báscula" in source
+        assert "Movimientos de arpillas" in source
+        assert "${w.scale_entries_count} / ${w.sack_entries_count}" not in source
 
     def test_report_with_entries(self, db_session, app):
         tz = app.config["HARVEST_TIMEZONE"]

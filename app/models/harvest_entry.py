@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import CheckConstraint
+from sqlalchemy.orm import synonym
 
 from app.extensions import db
 
@@ -20,14 +21,23 @@ class HarvestEntry(db.Model):
             name="ck_harvest_entries_rate_snapshot_non_negative",
         ),
         CheckConstraint(
+            "rate_per_sack_snapshot IS NULL OR rate_per_sack_snapshot >= 0",
+            name="ck_harvest_entries_sack_rate_snapshot_non_negative",
+        ),
+        CheckConstraint(
             "amount_mxn IS NULL OR amount_mxn >= 0",
             name="ck_harvest_entries_amount_non_negative",
         ),
         CheckConstraint(
             "(product_id IS NULL AND product_name_snapshot IS NULL "
-            "AND rate_per_kg_snapshot IS NULL AND amount_mxn IS NULL) OR "
+            "AND rate_per_kg_snapshot IS NULL AND rate_per_sack_snapshot IS NULL "
+            "AND amount_mxn IS NULL) OR "
             "(product_id IS NOT NULL AND product_name_snapshot IS NOT NULL "
-            "AND rate_per_kg_snapshot IS NOT NULL AND amount_mxn IS NOT NULL)",
+            "AND amount_mxn IS NOT NULL AND ("
+            "(registration_type = 'scale' AND rate_per_kg_snapshot IS NOT NULL "
+            "AND rate_per_sack_snapshot IS NULL) OR "
+            "(registration_type = 'sacks' AND "
+            "(rate_per_sack_snapshot IS NOT NULL OR rate_per_kg_snapshot IS NOT NULL))))",
             name="ck_harvest_entries_product_snapshot_consistency",
         ),
         CheckConstraint(
@@ -62,8 +72,13 @@ class HarvestEntry(db.Model):
     rate_per_kg_snapshot = db.Column(db.Numeric(8, 2), nullable=True)
     amount_mxn = db.Column(db.Numeric(12, 2), nullable=True)
     registration_type = db.Column(db.String(10), nullable=False, default="scale")
+    # Public domain name for the persisted registration_type column. Keeping a
+    # synonym avoids duplicating schema or rewriting historical rows.
+    measurement_mode = synonym("registration_type")
     sack_count = db.Column(db.Integer, nullable=True)
     average_sack_weight_kg_snapshot = db.Column(db.Numeric(10, 3), nullable=True)
+    rate_per_sack_snapshot = db.Column(db.Numeric(8, 2), nullable=True)
+    price_per_sack_snapshot = synonym("rate_per_sack_snapshot")
 
     worker_assignment_id = db.Column(
         db.Integer,
