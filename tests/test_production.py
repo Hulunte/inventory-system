@@ -1774,7 +1774,7 @@ class TestFrozenDatabaseStartup:
 
         config = AlembicConfig(str(Path(migrations_dir) / "alembic.ini"))
         config.set_main_option("script_location", migrations_dir)
-        assert ScriptDirectory.from_config(config).get_heads() == ["f3a4b5c6d7e8"]
+        assert ScriptDirectory.from_config(config).get_heads() == ["b5c6d7e8f9a0"]
 
     def test_migration_traceback_redacts_database_password(self):
         from production import _redacted_traceback
@@ -1788,6 +1788,15 @@ class TestFrozenDatabaseStartup:
 
         assert "secret" not in rendered
         assert "<redacted DATABASE_URL>" in rendered
+
+    def test_windowed_entrypoint_suppresses_secondary_exit_code_dialog(self):
+        source = Path(__file__).resolve().parents[1].joinpath("production.py").read_text(
+            encoding="utf-8"
+        )
+        assert 'if __name__ == "__main__":' in source
+        assert 'if getattr(sys, "frozen", False):' in source
+        assert "os._exit(exit_code)" in source
+        assert "complete,\n        # credential-redacted traceback" in source
 
     def test_setup_browser_opens_setup_path(self):
         from production import _open_browser

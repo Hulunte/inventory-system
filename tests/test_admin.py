@@ -162,6 +162,14 @@ class TestAdminEndpoints:
         assert "Active One" in names
         assert "Inactive One" in names
 
+    def test_admin_page_exposes_inactive_filter_and_reactivate_flow(self, admin_client):
+        html = admin_client.get("/admin").get_data(as_text=True)
+        javascript = admin_client.get("/static/js/admin.js").get_data(as_text=True)
+        assert 'id="show-inactive-slots"' in html
+        assert 'params.set("include_inactive", "true")' in javascript
+        assert 'data-action="${actionEndpoint}"' in javascript
+        assert 'const actionLabel = action === "deactivate" ? "desactivar" : "reactivar"' in javascript
+
     def test_search_workers_endpoint(self, admin_client, db_session):
         worker = Worker(barcode="TRB000021", name="Searchable Person", slot_number=21)
         db_session.add(worker)

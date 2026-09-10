@@ -130,7 +130,6 @@ def render_ticket(
 
     for line_data in product_lines:
         pname = _sanitize(line_data["product_name"])
-        rate = Decimal(str(line_data["rate_per_kg"]))
         weight = Decimal(str(line_data["weight_kg"]))
         amount = line_data["amount_mxn"]
 
@@ -138,7 +137,18 @@ def render_ticket(
         buf.extend(_encode(_truncate(pname, name_col_width), encoding))
         buf.extend(b"\n")
 
-        detail = f"  {weight:.3f} kg x ${rate:.2f}"
+        if line_data.get("registration_type") == "sacks":
+            sack_price = line_data.get("price_per_sack")
+            detail = (
+                f"  {line_data.get('sack_count')} arpillas x ${Decimal(str(sack_price)):.2f}"
+                if sack_price is not None else "  ARPILLAS - PRECIO N/D"
+            )
+        else:
+            rate = line_data.get("rate_per_kg")
+            detail = (
+                f"  {weight:.3f} kg x ${Decimal(str(rate)):.2f}"
+                if rate is not None else "  BASCULA - PRECIO N/D"
+            )
         buf.extend(_encode(_left(detail, cpl - 10), encoding))
         if amount is not None:
             amount_str = f"${Decimal(str(amount)):.2f}"

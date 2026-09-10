@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ session.get('csrf_token', '') }}">
 
     <title>Registro de cosecha</title>
 
@@ -92,6 +93,23 @@
             </div>
 
             <div class="scale-section__controls">
+                <div class="scale-section__row scale-read-mode">
+                    <label for="scale-auto-read">Lectura automática en tiempo real</label>
+                    <select id="scale-auto-read" class="scale-select">
+                        <option value="off" selected>Desactivada</option>
+                        <option value="on">Activada</option>
+                    </select>
+                    <button type="button" class="scale-btn scale-btn--sm" id="scale-read-once-btn" disabled>
+                        Actualizar lectura
+                    </button>
+                </div>
+                <div class="scale-section__row scale-autofill-mode">
+                    <label for="scale-autofill-weight">Autorrellenar peso de b&aacute;scula</label>
+                    <select id="scale-autofill-weight" class="scale-select" disabled>
+                        <option value="off">Desactivado</option>
+                        <option value="on" selected>Activado</option>
+                    </select>
+                </div>
                 <div class="scale-section__row">
                     <label class="scale-label" for="scale-port-select">Puerto</label>
                     <select class="scale-select" id="scale-port-select">
@@ -119,6 +137,7 @@
                 </div>
                 <div class="scale-reading__meta">
                     <span class="scale-reading__stability" id="scale-stability-indicator">Inestable</span>
+                    <span id="scale-last-reading-time">Sin lectura</span>
                     <span class="scale-reading__error" id="scale-reading-error" hidden></span>
                 </div>
                 <div class="scale-reading__actions">
@@ -146,19 +165,19 @@
                 <button type="button" class="btn btn--secondary" id="close-sacks-mode">Regresar a modo b&aacute;scula</button>
             </div>
             <form id="sacks-form" class="sacks-mode__form" autocomplete="off">
-                <label for="sacks-barcode">C&oacute;digo del trabajador</label>
-                <input id="sacks-barcode" required placeholder="Escanee o escriba el c&oacute;digo">
-                <div id="sacks-worker" class="sacks-mode__worker">Esperando trabajador...</div>
                 <fieldset class="sacks-mode__products">
                     <legend>Producto</legend>
                     <div id="sacks-product-buttons" class="product-selector__buttons" role="radiogroup" aria-label="Producto para arpillas">
                         <div class="status-message status-message--loading"><span class="spinner"></span>Cargando productos...</div>
                     </div>
                 </fieldset>
+                <label for="sacks-barcode">C&oacute;digo del trabajador</label>
+                <input id="sacks-barcode" required placeholder="Escanee o escriba el c&oacute;digo">
+                <div id="sacks-worker" class="sacks-mode__worker">Esperando trabajador...</div>
                 <label for="sacks-count">Cantidad de arpillas</label>
                 <input id="sacks-count" type="number" min="1" step="1" inputmode="numeric" required>
                 <div id="sacks-statistics" class="sacks-mode__statistics average-summary">Promedio no disponible</div>
-                <button type="submit" class="btn btn--primary" id="sacks-submit">Registrar peso estimado</button>
+                <button type="button" class="btn btn--primary" id="sacks-submit">Registrar cantidad</button>
                 <div id="sacks-message" class="status-message" hidden aria-live="polite"></div>
             </form>
         </section>
@@ -201,9 +220,9 @@
         </form>
     </dialog>
 
-    <script src="{{ url_for('static', filename='js/reception.js', v='20260909-6') }}"></script>
-    <script src="{{ url_for('static', filename='js/sacks.js', v='20260909-2') }}"></script>
-    <script src="{{ url_for('static', filename='js/scale.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/reception.js', v='20260909-7') }}"></script>
+    <script src="{{ url_for('static', filename='js/sacks.js', v='20260909-3') }}"></script>
+    <script src="{{ url_for('static', filename='js/scale.js', v='20260910-3') }}"></script>
     <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
 </body>
 

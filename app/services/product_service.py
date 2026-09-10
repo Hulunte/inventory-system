@@ -51,6 +51,15 @@ def _format_rate(rate):
     return str(rate.quantize(Decimal("0.01")))
 
 
+def _validate_optional_rate(value, field_name):
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    try:
+        return _validate_rate(value)
+    except ValueError as exc:
+        raise ValueError(str(exc).replace("rate_per_kg", field_name)) from exc
+
+
 def _validate_average_sack_weight(value):
     if value is None or (isinstance(value, str) and not value.strip()):
         return None
@@ -76,6 +85,7 @@ def serialize_product(product):
             str(product.average_sack_weight_kg.quantize(Decimal("0.001")))
             if product.average_sack_weight_kg is not None else None
         ),
+        "rate_per_sack": _format_rate(product.rate_per_sack) if product.rate_per_sack is not None else None,
         "active": product.active,
         "created_at": product.created_at.isoformat(),
         "updated_at": product.updated_at.isoformat(),
@@ -106,10 +116,11 @@ def _is_duplicate_product_name_error(error):
     return getattr(diag, "constraint_name", None) == "ux_products_name_lower"
 
 
-def create_product(name, rate_per_kg, average_sack_weight_kg=None):
+def create_product(name, rate_per_kg, average_sack_weight_kg=None, rate_per_sack=None):
     name = _validate_name(name)
     rate_per_kg = _validate_rate(rate_per_kg)
     average_sack_weight_kg = _validate_average_sack_weight(average_sack_weight_kg)
+    rate_per_sack = _validate_optional_rate(rate_per_sack, "rate_per_sack")
 
     existing = Product.query.filter(
         func.lower(Product.name) == name.lower()
@@ -117,7 +128,7 @@ def create_product(name, rate_per_kg, average_sack_weight_kg=None):
     if existing:
         raise DuplicateProductError("El producto ya existe.")
 
-    product = Product(name=name, rate_per_kg=rate_per_kg, average_sack_weight_kg=average_sack_weight_kg)
+    product = Product(name=name, rate_per_kg=rate_per_kg, average_sack_weight_kg=average_sack_weight_kg, rate_per_sack=rate_per_sack)
     db.session.add(product)
     try:
         db.session.commit()
@@ -129,7 +140,7 @@ def create_product(name, rate_per_kg, average_sack_weight_kg=None):
     return product
 
 
-def update_product(product_id, name=None, rate_per_kg=None, average_sack_weight_kg=...):
+def update_product(product_id, name=None, rate_per_kg=None, average_sack_weight_kg=..., rate_per_sack=...):
     product = db.session.get(Product, product_id)
     if product is None:
         return None
@@ -142,6 +153,8 @@ def update_product(product_id, name=None, rate_per_kg=None, average_sack_weight_
         product.rate_per_kg = rate_per_kg
     if average_sack_weight_kg is not ...:
         product.average_sack_weight_kg = _validate_average_sack_weight(average_sack_weight_kg)
+    if rate_per_sack is not ...:
+        product.rate_per_sack = _validate_optional_rate(rate_per_sack, "rate_per_sack")
 
     try:
         db.session.commit()
@@ -210,6 +223,7 @@ def get_active_products_for_reception():
                 str(product.average_sack_weight_kg.quantize(Decimal("0.001")))
                 if product.average_sack_weight_kg is not None else None
             ),
+            "rate_per_sack": _format_rate(product.rate_per_sack) if product.rate_per_sack is not None else None,
             "sack_statistics": {
                 "average_kg_per_movement": (
                     str((total_kg / total_movements).quantize(Decimal("0.001")))

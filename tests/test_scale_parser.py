@@ -81,10 +81,10 @@ class TestParseWeightLine:
         assert not r.ok
         assert r.error == "negative_weight"
 
-    def test_zero_weight_rejected(self):
+    def test_zero_weight_is_a_valid_reading(self):
         r = parse_weight_line("0.000 kg", timestamp=FIXED_TS)
-        assert not r.ok
-        assert r.error == "zero_weight"
+        assert r.ok
+        assert r.weight_kg == Decimal("0.000")
 
     def test_empty_line_rejected(self):
         r = parse_weight_line("", timestamp=FIXED_TS)

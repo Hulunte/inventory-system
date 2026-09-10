@@ -269,6 +269,7 @@ barcodeInput.addEventListener("keydown", async (event) => {
 
     event.preventDefault();
     scannerDebug("scanner enter recibido");
+    window.dispatchEvent(new CustomEvent("inventory:worker-invalid"));
     const initialScrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
     const barcode = barcodeInput.value.trim();
 
@@ -309,7 +310,9 @@ barcodeInput.addEventListener("keydown", async (event) => {
 
         scannerDebug("trabajador validado");
         barcodeInput.blur();
-        await showWorker(worker);
+        if (await showWorker(worker)) {
+            window.dispatchEvent(new CustomEvent("inventory:worker-validated"));
+        }
 
     } catch (error) {
         console.error(error);
@@ -319,6 +322,7 @@ barcodeInput.addEventListener("keydown", async (event) => {
                 No fue posible consultar el trabajador.
             </div>
         `;
+        window.dispatchEvent(new CustomEvent("inventory:worker-invalid"));
         await restoreBarcodePosition(initialScrollTop);
     }
 });
@@ -475,6 +479,7 @@ async function showWorker(worker) {
                 `;
 
                 barcodeInput.value = "";
+                window.dispatchEvent(new CustomEvent("inventory:movement-registered"));
                 await showRecentMovementAfterRegistration();
 
             } catch (error) {
@@ -492,6 +497,7 @@ async function showWorker(worker) {
                 });
             }
         });
+        return true;
     } catch (error) {
         console.error(error);
 
@@ -500,6 +506,7 @@ async function showWorker(worker) {
                 Trabajador encontrado, pero no fue posible consultar el total diario.
             </div>
         `;
+        return false;
     }
 }
 

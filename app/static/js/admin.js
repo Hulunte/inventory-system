@@ -1,5 +1,6 @@
 const logoutBtn = document.getElementById("logout-btn");
 const slotSearchInput = document.getElementById("slot-search-input");
+const showInactiveSlots = document.getElementById("show-inactive-slots");
 const slotList = document.getElementById("slot-list");
 const cleanSlotsBtn = document.getElementById("clean-slots-btn");
 const slotsEmailInput = document.getElementById("slots-email-input");
@@ -78,15 +79,19 @@ slotSearchInput.addEventListener("input", () => {
     }, 250);
 });
 
+showInactiveSlots.addEventListener("change", () => {
+    loadWorkerSlots(slotSearchInput.value.trim());
+});
+
 
 async function loadWorkerSlots(query) {
     slotList.innerHTML = `<p class="worker-list__empty">Cargando...</p>`;
 
     try {
-        let url = "/api/admin/worker-slots";
-        if (query) {
-            url += `?q=${encodeURIComponent(query)}`;
-        }
+        const params = new URLSearchParams();
+        if (query) params.set("q", query);
+        if (showInactiveSlots.checked) params.set("include_inactive", "true");
+        const url = `/api/admin/worker-slots${params.size ? `?${params}` : ""}`;
 
         const response = await fetch(url);
 

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import sys
 import time
 
@@ -9,6 +10,17 @@ from config import Config
 from app.extensions import db, migrate
 
 logger = logging.getLogger(__name__)
+
+
+def _redact_error_detail(value):
+    detail = str(value)
+    detail = re.sub(r"(\w+://[^:\s]+:)[^@\s]+@", r"\1<redacted>@", detail)
+    detail = re.sub(
+        r"(?i)(password\s*[=:]\s*)[^\s,;]+",
+        r"\1<redacted>",
+        detail,
+    )
+    return detail[:4000]
 
 
 def _check_postgres(uri):
@@ -95,7 +107,13 @@ def create_app(config_class=None):
 def _register_error_handlers(app):
     @app.errorhandler(500)
     def internal_error(error):
-        logger.error("Internal server error: %s", error)
+        original = getattr(error, "original_exception", None) or error
+        logger.error(
+            "Internal server error endpoint=%s type=%s detail=%s",
+            request.path,
+            type(original).__name__,
+            _redact_error_detail(original),
+        )
         return jsonify({"error": "Error interno del servidor"}), 500
 
     @app.errorhandler(502)

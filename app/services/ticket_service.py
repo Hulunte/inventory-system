@@ -13,12 +13,13 @@ from app.models.harvest_entry import HarvestEntry
 @dataclass
 class ProductLine:
     product_name: str
-    rate_per_kg: Decimal
+    rate_per_kg: Optional[Decimal]
     weight_kg: Decimal
     amount_mxn: Optional[Decimal]
     registration_type: str = "scale"
     sack_count: Optional[int] = None
     average_sack_weight_kg: Optional[Decimal] = None
+    price_per_sack: Optional[Decimal] = None
 
 
 @dataclass
@@ -65,6 +66,7 @@ def get_daily_tickets(operational_date, query_filter=None, tz=None):
             HarvestEntry.worker_barcode_snapshot,
             HarvestEntry.product_name_snapshot,
             HarvestEntry.rate_per_kg_snapshot,
+            HarvestEntry.rate_per_sack_snapshot,
             HarvestEntry.registration_type,
             HarvestEntry.sack_count,
             HarvestEntry.average_sack_weight_kg_snapshot,
@@ -83,6 +85,7 @@ def get_daily_tickets(operational_date, query_filter=None, tz=None):
             HarvestEntry.worker_barcode_snapshot,
             HarvestEntry.product_name_snapshot,
             HarvestEntry.rate_per_kg_snapshot,
+            HarvestEntry.rate_per_sack_snapshot,
             HarvestEntry.registration_type,
             HarvestEntry.sack_count,
             HarvestEntry.average_sack_weight_kg_snapshot,
@@ -126,15 +129,21 @@ def get_daily_tickets(operational_date, query_filter=None, tz=None):
         weight = Decimal(str(r.total_weight_kg))
         amount = Decimal(str(r.total_amount_mxn))
 
-        if r.product_name_snapshot and r.rate_per_kg_snapshot is not None:
+        price_is_complete = (
+            r.rate_per_sack_snapshot is not None
+            if r.registration_type == "sacks"
+            else r.rate_per_kg_snapshot is not None
+        )
+        if r.product_name_snapshot and price_is_complete:
             line = ProductLine(
                 product_name=r.product_name_snapshot,
-                rate_per_kg=Decimal(str(r.rate_per_kg_snapshot)),
+                rate_per_kg=(Decimal(str(r.rate_per_kg_snapshot)) if r.rate_per_kg_snapshot is not None else None),
                 weight_kg=weight,
                 amount_mxn=amount,
                 registration_type=r.registration_type,
                 sack_count=r.sack_count,
                 average_sack_weight_kg=(Decimal(str(r.average_sack_weight_kg_snapshot)) if r.average_sack_weight_kg_snapshot is not None else None),
+                price_per_sack=(Decimal(str(r.rate_per_sack_snapshot)) if r.rate_per_sack_snapshot is not None else None),
             )
             ticket.product_lines.append(line)
             ticket.total_weight_kg += weight
@@ -149,6 +158,7 @@ def get_daily_tickets(operational_date, query_filter=None, tz=None):
                 registration_type=r.registration_type,
                 sack_count=r.sack_count,
                 average_sack_weight_kg=(Decimal(str(r.average_sack_weight_kg_snapshot)) if r.average_sack_weight_kg_snapshot is not None else None),
+                price_per_sack=(Decimal(str(r.rate_per_sack_snapshot)) if r.rate_per_sack_snapshot is not None else None),
             )
             ticket.product_lines.append(line)
             ticket.total_weight_kg += weight
@@ -192,7 +202,9 @@ def serialize_ticket(ticket):
         "product_lines": [
             {
                 "product_name": line.product_name,
-                "rate_per_kg": f"{line.rate_per_kg:.2f}",
+                "rate_per_kg": f"{line.rate_per_kg:.2f}" if line.rate_per_kg is not None else None,
+                "price_per_sack": f"{line.price_per_sack:.2f}" if line.price_per_sack is not None else None,
+                "measurement_mode": line.registration_type,
                 "weight_kg": f"{line.weight_kg:.3f}",
                 "amount_mxn": f"{line.amount_mxn:.2f}" if line.amount_mxn is not None else None,
                 "registration_type": line.registration_type,

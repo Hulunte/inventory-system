@@ -344,6 +344,24 @@ body {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
+.search-zone__inactive {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 42px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--clr-text);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.search-zone__inactive input {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: var(--clr-primary);
+}
+
 /* ---------- Worker List ---------- */
 
 .worker-list {
@@ -792,6 +810,11 @@ body {
 
     .search-zone__input {
         width: 100%;
+    }
+
+    .search-zone {
+        width: 100%;
+        flex-wrap: wrap;
     }
 
     .worker-row {

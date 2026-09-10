@@ -41,6 +41,15 @@ def test_packaged_reception_resources_match_sources_byte_for_byte():
         (ROOT / "app" / "static" / "js" / "sacks.js").read_bytes()
     )
     assert b"/api/harvest/sack-entries" in packaged_sacks
+    for source_path, archive_name in (
+        (ROOT / "app" / "static" / "js" / "scale.js", r"app\static\js\scale.js"),
+        (ROOT / "app" / "static" / "js" / "products.js", r"app\static\js\products.js"),
+        (ROOT / "app" / "static" / "js" / "reports.js", r"app\static\js\reports.js"),
+        (ROOT / "app" / "templates" / "products.html", r"app\templates\products.html"),
+    ):
+        assert normalize_newlines(archive.extract(archive_name)) == normalize_newlines(
+            source_path.read_bytes()
+        )
 
 
 def test_packaged_phase2_ticket_resources_match_sources():

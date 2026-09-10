@@ -91,7 +91,7 @@ def api_scale_connect():
     if not isinstance(data, dict):
         return jsonify({"error": "Request body must be a JSON object"}), 400
 
-    KNOWN_FIELDS = {"port", "baudrate", "bytesize", "parity", "stopbits", "timeout_seconds", "line_encoding", "profile"}
+    KNOWN_FIELDS = {"port", "baudrate", "bytesize", "parity", "stopbits", "timeout_seconds", "line_encoding", "profile", "automatic_read"}
     unknown = set(data.keys()) - KNOWN_FIELDS
     if unknown:
         return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown))}"}), 400
@@ -146,6 +146,39 @@ def api_scale_connect():
         code = svc.get_status().get("code", "serial_read_error")
         return jsonify({"error": str(e), "code": code}), 422
 
+    svc.set_automatic_read(bool(data.get("automatic_read", False)))
+    if svc.get_status()["automatic_read"]:
+        svc.request_weight()
+    return jsonify(svc.get_status())
+
+
+@scale_bp.post("/api/scale/read")
+@_require_admin
+@_require_csrf
+def api_scale_read():
+    svc = get_scale_service()
+    if not svc.connected:
+        return jsonify({"error": "No hay conexion activa"}), 409
+    try:
+        svc.request_weight()
+    except ScaleConnectionError as e:
+        return jsonify({"error": str(e), "code": "serial_read_error"}), 422
+    return jsonify(svc.get_status())
+
+
+@scale_bp.post("/api/scale/automatic")
+@_require_admin
+@_require_csrf
+def api_scale_automatic():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("enabled"), bool):
+        return jsonify({"error": "enabled must be a boolean"}), 400
+    svc = get_scale_service()
+    if not svc.connected:
+        return jsonify({"error": "No hay conexion activa"}), 409
+    svc.set_automatic_read(data["enabled"])
+    if data["enabled"]:
+        svc.request_weight()
     return jsonify(svc.get_status())
 
 

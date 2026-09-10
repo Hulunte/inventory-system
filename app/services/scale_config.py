@@ -9,12 +9,12 @@ from dataclasses import dataclass
 
 DEFAULT_BAUDRATE = 9600
 DEFAULT_BYTESIZE = 8
-DEFAULT_PARITY = "N"
-DEFAULT_STOPBITS = 1
+DEFAULT_PARITY = "E"
+DEFAULT_STOPBITS = 2
 DEFAULT_TIMEOUT_SECONDS = 1.0
 DEFAULT_LINE_ENCODING = "ascii"
 DEFAULT_PROFILE = "generic"
-DEFAULT_TERMINATOR = "CR"
+DEFAULT_TERMINATOR = "CRCRLF"
 DEFAULT_HANDSHAKE = "none"
 DEFAULT_MIN_WEIGHT_KG = "0.001"
 DEFAULT_MAX_WEIGHT_KG = "999.999"
@@ -98,8 +98,8 @@ def load_scale_config() -> ScaleConfig:
         raise ValueError(f"SCALE_PROFILE invalid: {profile}. Use one of {VALID_PROFILES}")
 
     terminator = os.getenv("SCALE_TERMINATOR", DEFAULT_TERMINATOR).strip().upper()
-    if terminator not in {"CR", "LF", "CRLF"}:
-        raise ValueError("SCALE_TERMINATOR invalid: use CR, LF, or CRLF")
+    if terminator not in {"CR", "LF", "CRLF", "CRCRLF"}:
+        raise ValueError("SCALE_TERMINATOR invalid: use CR, LF, CRLF, or CRCRLF")
     handshake = os.getenv("SCALE_HANDSHAKE", DEFAULT_HANDSHAKE).strip().lower()
     if handshake != "none":
         raise ValueError("SCALE_HANDSHAKE invalid: only none is supported")

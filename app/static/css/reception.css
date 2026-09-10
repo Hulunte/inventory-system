@@ -607,6 +607,82 @@ body {
 .sacks-mode__worker, .sacks-mode__statistics { padding: 0.8rem; background: var(--clr-bg); border-radius: var(--radius-sm); }
 .sacks-mode__products { border: 0; min-width: 0; }
 .sacks-mode__products legend { margin-bottom: 0.65rem; font-weight: 700; }
+
+/* Acciones del modo por arpillas: controles grandes, consistentes y táctiles. */
+.sacks-mode .btn {
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: 52px;
+    padding: 0.9rem 1.25rem;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(22, 118, 63, 0.16);
+    transition: background-color 140ms ease, border-color 140ms ease,
+        box-shadow 140ms ease, transform 120ms ease, opacity 140ms ease;
+}
+
+.sacks-mode .btn--primary {
+    display: block;
+    width: 100%;
+    min-height: 60px;
+    margin-top: 0.35rem;
+    color: #fff !important;
+    background: var(--brand-green) !important;
+    border-color: var(--brand-green) !important;
+    font-size: 1.08rem;
+    letter-spacing: 0.01em;
+    box-shadow: 0 5px 12px rgba(20, 122, 56, 0.24);
+}
+
+.sacks-mode .btn--primary:hover {
+    background: var(--brand-green-dark) !important;
+    border-color: var(--brand-green-dark) !important;
+    box-shadow: 0 7px 16px rgba(20, 122, 56, 0.3);
+}
+
+.sacks-mode .btn--secondary {
+    color: var(--brand-green-dark) !important;
+    background: var(--brand-soft-green) !important;
+    border-color: var(--brand-green) !important;
+}
+
+.sacks-mode .btn--secondary:hover {
+    color: #fff !important;
+    background: var(--brand-green) !important;
+    border-color: var(--brand-green) !important;
+    box-shadow: 0 5px 12px rgba(20, 122, 56, 0.22);
+}
+
+.sacks-mode .btn--primary:focus-visible,
+.sacks-mode .btn--secondary:focus-visible {
+    outline: 4px solid rgba(20, 122, 56, 0.28);
+    outline-offset: 3px;
+}
+
+.sacks-mode .btn--primary:active,
+.sacks-mode .btn--secondary:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 5px rgba(20, 122, 56, 0.2);
+}
+
+.sacks-mode .btn:disabled,
+.sacks-mode .btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+@media (max-width: 600px) {
+    .sacks-mode .btn--secondary { width: 100%; }
+}
+
 .sacks-mode .product-selector__buttons {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -684,19 +760,31 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.65rem 0.9rem;
-    border-radius: 8px;
+    min-height: 46px;
+    padding: 0.7rem 1rem;
+    border: 2px solid #16763f;
+    border-radius: 12px;
     background: #16763f;
     color: #fff;
     font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
+    box-shadow: 0 3px 8px rgba(22, 118, 63, 0.18);
+    transition: background-color 140ms ease, border-color 140ms ease,
+        box-shadow 140ms ease, transform 120ms ease;
 }
 
 .scanner-zone__tickets:hover,
 .scanner-zone__tickets:focus-visible {
     background: #0f5d31;
+    border-color: #0f5d31;
     outline: 3px solid rgba(22, 118, 63, 0.22);
+    box-shadow: 0 5px 12px rgba(22, 118, 63, 0.26);
+}
+
+.scanner-zone__tickets:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 5px rgba(22, 118, 63, 0.18);
 }
 
 .scanner-zone__tickets svg {
@@ -710,7 +798,8 @@ body {
     }
 
     .scanner-zone__tickets {
-        padding: 0.6rem;
+        min-height: 44px;
+        padding: 0.6rem 0.75rem;
     }
 
     .scanner-zone__tickets span {

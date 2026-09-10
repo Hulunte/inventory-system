@@ -93,9 +93,6 @@ def parse_weight_line(
     if weight < 0:
         return _error(raw_line, "negative_weight", source_port, timestamp)
 
-    if weight == 0:
-        return _error(raw_line, "zero_weight", source_port, timestamp)
-
     if _too_many_decimals(weight, max_decimals):
         return _error(raw_line, "too_many_decimals", source_port, timestamp)
 
@@ -115,7 +112,7 @@ def parse_weight_line(
     min_d = _safe_decimal(min_weight_kg, Decimal("0.001"))
     max_d = _safe_decimal(max_weight_kg, Decimal("999.999"))
 
-    if weight < min_d:
+    if weight != 0 and weight < min_d:
         return _error(raw_line, "weight_below_minimum", source_port, timestamp)
 
     if weight > max_d:

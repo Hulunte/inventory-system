@@ -14,6 +14,7 @@ let sacksCsrf = "";
 let sacksBusy = false;
 let validatedSacksBarcode = "";
 let selectedSacksProductId = null;
+const SACKS_PRODUCT_STORAGE_KEY = "inventory.sacksProductId";
 
 function showSacksMessage(text, error = false) {
     sacksMessage.hidden = false;
@@ -35,9 +36,29 @@ async function initializeSacksMode() {
         ? products.map(product => `<button type="button" class="product-button sacks-product-button"
             role="radio" aria-checked="false" data-product-id="${product.id}">
             <span class="product-button__name">${escapeHtml(product.name)}</span>
-            <span class="product-button__rate">$${escapeHtml(product.rate_per_kg)}/kg</span>
+            <span class="product-button__rate">${product.rate_per_sack !== null ? `$${escapeHtml(product.rate_per_sack)}/arpilla` : "Precio por arpilla no configurado"}</span>
         </button>`).join("")
         : '<div class="status-message status-message--error">No hay productos activos.</div>';
+    const storedProductId = Number(localStorage.getItem(SACKS_PRODUCT_STORAGE_KEY));
+    const productToRestore = products.find(product => product.id === storedProductId);
+    if (productToRestore) {
+        selectSacksProduct(productToRestore.id, false);
+    } else {
+        selectedSacksProductId = null;
+        renderSackStatistics(null);
+    }
+    return true;
+}
+
+function selectSacksProduct(productId, persist = true) {
+    const product = allProducts.find(item => item.id === productId);
+    if (!product) return false;
+    selectedSacksProductId = productId;
+    sacksProductButtons.querySelectorAll(".sacks-product-button").forEach(item => {
+        item.setAttribute("aria-checked", String(Number(item.dataset.productId) === productId));
+    });
+    if (persist) localStorage.setItem(SACKS_PRODUCT_STORAGE_KEY, String(productId));
+    renderSackStatistics(product);
     return true;
 }
 
@@ -45,7 +66,7 @@ function renderSackStatistics(product) {
     const stats = product?.sack_statistics || {};
     const unavailable = "Promedio no disponible";
     sacksStatistics.innerHTML = `<strong>Resumen por arpillas</strong>
-        <span>Kg promedio por arpilla: ${escapeHtml(stats.average_kg_per_sack || product?.average_sack_weight_kg || unavailable)}</span>
+        <span>Kg promedio por arpilla configurado: ${escapeHtml(product?.average_sack_weight_kg || unavailable)}</span>
         <span>Kg promedio por movimiento: ${escapeHtml(stats.average_kg_per_movement || unavailable)}</span>
         <span>Total de arpillas: ${Number(stats.total_sacks || 0)}</span>
         <span>Total de movimientos: ${Number(stats.total_movements || 0)}</span>
@@ -76,31 +97,36 @@ sacksBarcode.addEventListener("keydown", async event => {
     const response = await fetch(`/api/workers/${encodeURIComponent(code)}`);
     const data = await response.json();
     if (!response.ok) return showSacksMessage(data.error || "Trabajador no encontrado.", true);
-    if (!data.has_assignment || !data.person_name || data.person_name === "Sin nombre") {
-        return showSacksMessage("Este cupo no tiene una persona asignada.", true);
-    }
     validatedSacksBarcode = code;
-    sacksWorker.textContent = `${data.slot_label} — ${data.person_name}`;
-    sacksProductButtons.querySelector("button")?.focus();
+    sacksWorker.textContent = `${data.slot_label} — ${data.person_name || "Sin nombre"}`;
+    sacksCount.focus({ preventScroll: true });
 });
 
 sacksProductButtons.addEventListener("click", async event => {
     const button = event.target.closest(".sacks-product-button[data-product-id]");
     if (!button) return;
-    selectedSacksProductId = Number(button.dataset.productId);
-    sacksProductButtons.querySelectorAll(".sacks-product-button").forEach(item => {
-        item.setAttribute("aria-checked", String(item === button));
-    });
-    renderSackStatistics(allProducts.find(product => product.id === selectedSacksProductId));
+    selectSacksProduct(Number(button.dataset.productId));
 });
 
-sacksForm.addEventListener("submit", async event => {
-    event.preventDefault();
+async function submitSackEntry() {
     if (sacksBusy) return;
     const count = Number(sacksCount.value);
+    const selectedProduct = allProducts.find(product => product.id === selectedSacksProductId);
     if (!validatedSacksBarcode) return showSacksMessage("Valide primero el trabajador.", true);
     if (!Number.isInteger(count) || count <= 0) return showSacksMessage("La cantidad de arpillas debe ser un entero positivo.", true);
     if (!selectedSacksProductId) return showSacksMessage("Seleccione un producto.", true);
+    if (!selectedProduct?.average_sack_weight_kg) {
+        return showSacksMessage(
+            "Falta configurar el promedio kg/arpilla de este producto en Productos.",
+            true,
+        );
+    }
+    if (selectedProduct?.rate_per_sack === null || selectedProduct?.rate_per_sack === undefined) {
+        return showSacksMessage("Falta configurar el precio por arpilla de este producto en Productos.", true);
+    }
+    if (!sacksCsrf) {
+        return showSacksMessage("La sesión administrativa no tiene un token CSRF válido.", true);
+    }
     sacksBusy = true;
     sacksSubmit.disabled = true;
     try {
@@ -109,8 +135,11 @@ sacksForm.addEventListener("submit", async event => {
             headers: { "Content-Type": "application/json", "X-CSRF-Token": sacksCsrf },
             body: JSON.stringify({ barcode: validatedSacksBarcode, product_id: selectedSacksProductId, sack_count: count }),
         });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "No fue posible registrar el movimiento.");
+        const contentType = response.headers.get("content-type") || "";
+        const result = contentType.includes("application/json")
+            ? await response.json()
+            : { error: await response.text() };
+        if (!response.ok) throw new Error(result.error || `No fue posible registrar el movimiento (HTTP ${response.status}).`);
         showSacksMessage(`Registrado: ${result.sack_count} arpillas, ${result.weight_kg} kg estimados, promedio ${result.average_sack_weight_kg} kg/arpilla, importe $${result.amount_mxn}.`);
         sacksCount.value = "";
         await loadRecentMovements();
@@ -122,4 +151,19 @@ sacksForm.addEventListener("submit", async event => {
         sacksBusy = false;
         sacksSubmit.disabled = false;
     }
+}
+
+sacksForm.addEventListener("submit", event => {
+    event.preventDefault();
+    submitSackEntry();
+});
+
+sacksCount.addEventListener("keydown", event => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    sacksForm.requestSubmit();
+});
+
+sacksSubmit.addEventListener("click", () => {
+    sacksForm.requestSubmit();
 });

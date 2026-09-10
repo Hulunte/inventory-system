@@ -480,4 +480,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit as exc:
+        # A windowed PyInstaller executable otherwise displays an additional
+        # fatal-error dialog containing only the process exit code (usually
+        # "1"). The actionable message was already shown and the complete,
+        # credential-redacted traceback was already written to the app log.
+        if getattr(sys, "frozen", False):
+            exit_code = exc.code if isinstance(exc.code, int) else 1
+            os._exit(exit_code)
+        raise

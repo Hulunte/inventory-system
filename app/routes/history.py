@@ -85,9 +85,12 @@ def assignment_entries(assignment_id):
                 "product_name": entry.product_name_snapshot,
                 "amount_mxn": str(entry.amount_mxn) if entry.amount_mxn is not None else None,
                 "registration_type": entry.registration_type,
+                "measurement_mode": entry.measurement_mode,
                 "registration_type_label": "Arpillas" if entry.registration_type == "sacks" else "Báscula",
                 "sack_count": entry.sack_count,
                 "average_sack_weight_kg": str(entry.average_sack_weight_kg_snapshot) if entry.average_sack_weight_kg_snapshot is not None else None,
+                "rate_per_kg": str(entry.rate_per_kg_snapshot) if entry.rate_per_kg_snapshot is not None else None,
+                "price_per_sack": str(entry.price_per_sack_snapshot) if entry.price_per_sack_snapshot is not None else None,
                 "estimated_weight": entry.registration_type == "sacks",
             }
         )

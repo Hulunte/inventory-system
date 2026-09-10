@@ -295,6 +295,7 @@ class TestPublicFields:
             "can_void",
             "registration_type", "registration_type_label", "sack_count",
             "average_sack_weight_kg", "estimated_weight",
+            "measurement_mode", "rate_per_sack",
         }
         assert set(m.keys()) == expected_keys
         assert set(m["worker"].keys()) == {"name", "barcode", "slot_number", "slot_label"}

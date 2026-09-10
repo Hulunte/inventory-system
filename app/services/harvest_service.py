@@ -115,7 +115,15 @@ def register_sack_harvest(barcode, sack_count, product_id):
         .with_for_update().one_or_none()
     )
     if assignment is None:
-        raise WorkerUnassignedError("Este cupo no tiene una persona asignada.")
+        # Match the scale workflow: an unused valid slot can record harvest
+        # without inventing a person, while keeping a stable assignment id for
+        # historical grouping and snapshots.
+        assignment = WorkerAssignment(
+            worker_id=worker.id,
+            person_name=ANONYMOUS_WORKER_NAME,
+        )
+        db.session.add(assignment)
+        db.session.flush()
     product = (
         Product.query.filter(Product.id == product_id, Product.active.is_(True))
         .with_for_update().one_or_none()
@@ -123,26 +131,31 @@ def register_sack_harvest(barcode, sack_count, product_id):
     if product is None:
         raise ProductUnavailableError("El producto seleccionado ya no está disponible.")
     if product.average_sack_weight_kg is None:
-        raise ValueError("Promedio no disponible")
+        raise ValueError(
+            "Falta configurar el promedio kg/arpilla de este producto en Productos."
+        )
+    if product.rate_per_sack is None:
+        raise ValueError("Falta configurar el precio por arpilla de este producto en Productos.")
 
     average = Decimal(str(product.average_sack_weight_kg))
     estimated_weight = (Decimal(sack_count) * average).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
-    rate = Decimal(str(product.rate_per_kg))
-    amount = (estimated_weight * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    rate_per_sack = Decimal(str(product.rate_per_sack))
+    amount = (Decimal(sack_count) * rate_per_sack).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     entry = HarvestEntry(
         worker_id=worker.id,
         worker_assignment_id=assignment.id,
         worker_slot_number_snapshot=worker.slot_number,
         worker_barcode_snapshot=worker.barcode,
-        worker_name_snapshot=assignment.person_name,
+        worker_name_snapshot=assignment.person_name or ANONYMOUS_WORKER_NAME,
         product_id=product.id,
         product_name_snapshot=product.name,
-        rate_per_kg_snapshot=rate,
+        rate_per_kg_snapshot=None,
         weight_kg=estimated_weight,
         amount_mxn=amount,
         registration_type="sacks",
         sack_count=sack_count,
         average_sack_weight_kg_snapshot=average,
+        price_per_sack_snapshot=rate_per_sack,
     )
     db.session.add(entry)
     db.session.commit()
@@ -250,9 +263,11 @@ def get_recent_movements(limit=10, can_void=False):
             ),
             "voided": entry.voided,
             "registration_type": entry.registration_type,
+            "measurement_mode": entry.measurement_mode,
             "registration_type_label": "Arpillas" if entry.registration_type == "sacks" else "Báscula",
             "sack_count": entry.sack_count,
             "average_sack_weight_kg": str(entry.average_sack_weight_kg_snapshot) if entry.average_sack_weight_kg_snapshot is not None else None,
+            "rate_per_sack": str(entry.price_per_sack_snapshot.quantize(Decimal("0.01"))) if entry.price_per_sack_snapshot is not None else None,
             "estimated_weight": entry.registration_type == "sacks",
             "can_void": bool(can_void),
         })

@@ -185,7 +185,10 @@ class TestExportSheets:
             "/api/reports/harvest/export?start_date=2026-01-01&end_date=2026-01-05"
         )
         wb = load_workbook(io.BytesIO(resp.data))
-        assert wb.sheetnames == ["Movimientos", "Resumen"]
+        assert wb.sheetnames[:4] == [
+            "Resumen báscula", "Resumen arpillas",
+            "Movimientos báscula", "Movimientos arpillas",
+        ]
 
     def test_filename_format(self, admin_client):
         resp = admin_client.get(
